@@ -3,6 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import dockcast.db.models  # noqa: F401  (registers tables on Base.metadata)
 from dockcast.config import get_env_settings
 from dockcast.db.engine import Base
 

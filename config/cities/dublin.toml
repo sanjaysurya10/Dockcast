@@ -5,5 +5,8 @@ timezone = "Europe/Dublin"
 centre_lat = 53.3473
 centre_lon = -6.2591
 default_zoom = 13.0
-# [VERIFY in M1] Discover from the data.gov.ie listing; PRD 5.1 D1. Overridable via GBFS_ROOT_URL.
-gbfs_root_url = ""
+# Verified 2026-10-15 from the data.gov.ie listing (resource "Dublinbikes GBFS API - JCDecaux").
+# GBFS 2.3, no key required. Overridable via GBFS_ROOT_URL.
+gbfs_root_url = "https://api.cyclocity.fr/contracts/dublin/gbfs/gbfs.json"
+# CKAN package holding the historical monthly CSVs (PRD 5.1 D2).
+ckan_package_url = "https://data.gov.ie/api/3/action/package_show?id=dublinbikes-api"

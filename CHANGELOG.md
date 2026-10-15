@@ -1,5 +1,22 @@
 # Changelog
 
+## M1 — Data foundation (in progress, 2026-10-15)
+
+- Live GBFS discovered (JCDecaux, GBFS 2.3) and wired into `config/cities/dublin.toml`.
+- Schema per PRD §8 (migration `0002`); `weather_hourly` uses a surrogate key plus a
+  `NULLS NOT DISTINCT` unique constraint because Postgres primary keys cannot contain the null
+  `issued_at` of observed rows.
+- `collector_runs.feed_last_updated` (migration `0003`) — feed-level staleness, replacing the
+  per-row `last_reported` rule (owner decision; see PRD §23).
+- Collector (`make collect`): 60 s polls on the minute, 3 retries (1/4/16 s), idempotent inserts,
+  gzip raw archive under `data/raw/gbfs/`, every run logged in `collector_runs`.
+- Historical backfill (`make backfill`): download from data.gov.ie, header-based format
+  detection (unknown headers rejected), loaders A (local time → UTC incl. DST) and B (UTC),
+  cleaning (bad times, negatives, duplicates), station ID reconciliation, `COPY` bulk load,
+  `data_quality_files` + `reports/data_profile.md`.
+- `make health`: collector uptime over the last 24 h (PRD S5).
+- PRD §23: D1, D2, trip data, D4 and D5 resolved with sources.
+
 ## M0 — Scaffold (2026-10-15)
 
 - Repo tree per PRD §7; `uv` project pinned to Python 3.12.

@@ -1024,15 +1024,29 @@ Type hints everywhere; docstrings on public functions (Google style); no noteboo
 
 Resolve during M1 (unless noted); write the answer and source link next to each item.
 
-- [ ] Exact GBFS root URL and whether a key/registration is needed (D1).
-- [ ] Historical file column names, snapshot interval, and the exact cut-over month between formats A and B (D2).
-- [ ] Do the feeds include any trip-level data? (Expected: no → confirms NG1.)
-- [ ] Historical hourly weather source and licence (D4).
-- [ ] `holidays` package coverage for IE (D5).
+- [x] Exact GBFS root URL and whether a key/registration is needed (D1).
+  **2026-10-15:** `https://api.cyclocity.fr/contracts/dublin/gbfs/gbfs.json` (JCDecaux, GBFS 2.3; v3.0 also listed in `gbfs_versions.json`). No key. Feeds keyed by language `"fr"`; `station_status` `Cache-Control: max-age=1`, `ttl: 1`. 115 stations (113 installed). Source: data.gov.ie package `dublinbikes-api` resource "Dublinbikes GBFS API - JCDecaux" (https://data.gov.ie/api/3/action/package_show?id=dublinbikes-api).
+  **Finding:** per-station `last_reported` does not advance when counts change (6 polls × 60 s: 59 count changes, 0 `last_reported` changes; median age ≈ 12.7 h). **Owner decision 2026-10-15:** staleness is judged on the feed's top-level `last_updated` (stored in `collector_runs.feed_last_updated`, stale if > 15 min); per-station flat-line detection (counts unchanged > N h while renting) moves to M2 cleaning. The 9.1 per-row rule is not applied.
+- [x] Historical file column names, snapshot interval, and the exact cut-over month between formats A and B (D2).
+  **2026-10-15**, from all downloaded files (`reports/data_profile.md`):
+  - Format A (`dublinbike-historical-data-YYYY-MM.csv`, 2021-10 → 2024-02): `STATION ID, TIME, LAST UPDATED, NAME, BIKE_STANDS, AVAILABLE_BIKE_STANDS, AVAILABLE_BIKES, STATUS, ADDRESS, LATITUDE, LONGITUDE`. **Europe/Dublin local time** (spring hour missing, autumn hour duplicated and interleaved). **Snapshot every 30 min.**
+  - Format B (`dublin-bikes_station_status_MMYYYY.csv`, 2024-05 → 2026-06): `system_id, last_reported, station_id, num_bikes_available, num_docks_available, is_installed, is_renting, is_returning, name, short_name, address, lat, lon, region_id, capacity`. `last_reported` is the snapshot time on a 5-min grid, **UTC** (no DST artefacts); **each station appears every ~10 min**.
+  - Cut-over: no files for **March–April 2024**; B starts 2024-05-02 19:00 UTC. Sep 2024 covers only 1–3 Sep; Jan 2026 ends 24 Jan; Feb 2026 starts 5 Feb. Latest published month: June 2026.
+  - Listing `size` metadata is stale (e.g. Aug 2024 listed as 21 bytes but now holds 632k rows); no in-scope file is currently empty.
+  - Consequence for 11.2: neither format has a ≤ 5-min per-station interval → per the rule already in 11.2, **event models train on collector data only**.
+  - Also listed: quarterly files Jul 2018 – Dec 2021 (`STATION ID, TIME, LAST UPDATED, NAME, BIKE STANDS, AVAILABLE BIKE STANDS, AVAILABLE BIKES, STATUS, ADDRESS, LATITUDE, LONGITUDE`, ~5-min interval). **Owner decision 2026-10-15: out of scope for now.**
+- [x] Do the feeds include any trip-level data? (Expected: no → confirms NG1.)
+  **2026-10-15: No.** GBFS lists only `gbfs_versions, station_information, system_information, station_status, vehicle_types`; historical files are station snapshots. NG1 confirmed.
+- [x] Historical hourly weather source and licence (D4).
+  **2026-10-15:** Met Éireann hourly station data, e.g. Dublin Airport (532) `https://clidata.met.ie/cli/climate_data/webdata/hly532.csv` (fetched OK; timestamps "Date and Time (utc)"; latest row 2026-10-01 00:00; wind in knots, cloud amount in oktas) and Phoenix Park (175) `hly175.csv`. Licence CC BY 4.0, attribution to Met Éireann required (https://data.gov.ie/dataset/dublin-airport-hourly-data). The older host `cli.fusio.net` was unreachable. Station choice is made in M2.
+- [x] `holidays` package coverage for IE (D5).
+  **2026-10-15:** `holidays` 0.106, `country_holidays("IE")` returns 9–10 days/year incl. St Brigid's Day (from 2023) and the one-off 2022-03-18 Day of Remembrance and Recognition.
 - [ ] MapLibre GL JS minimum version with globe projection (M13).
 - [ ] Basemap tile provider terms and attribution (M13).
 - [ ] Free-tier limits of chosen hosting providers (M17).
-- [ ] Station count and real storage estimate (M1).
+- [x] Station count and real storage estimate (M1).
+  **2026-10-15:** live feed 115 stations (113 installed); history 116 legacy IDs (114 exact matches, 2 new: 92 Heuston Bridge (North), 507 Oriel Street Test Terminal). Backfill = 19,909,798 rows (A 4,759,858; B 15,149,940); `station_status_raw` = 2,677 MB incl. indexes (≈ 135 B/row). Live: 115 × 1,440 = 165,600 rows/day ≈ 22 MB/day → ≈ 0.67 GB for the 30-day retention window. 15-min grid ≈ 11,040 rows/day. Implication for M17: the raw history does not fit typical free-tier Postgres; keep raw history local/Parquet and ship only the 15-min table to prod.
+  **Reconciliation finding (needs owner decision):** legacy ID 34 is "PORTOBELLO HARBOUR" in history but "LENNOX STREET" (114 m away) in the live feed; the exact-ID-first rule (9.2 step 4) merges them. Six other exact matches are 35–51 m apart with identical names (likely coordinate updates).
 
 ---
 

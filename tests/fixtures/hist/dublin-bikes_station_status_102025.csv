@@ -1,0 +1,8 @@
+"system_id","last_reported","station_id","num_bikes_available","num_docks_available","is_installed","is_renting","is_returning","name","short_name","address","lat","lon","region_id","capacity"
+"dublin_bikes","2025-10-26 00:05:00","1",16,15,true,true,true,"CLARENDON ROW","","Clarendon Row",53.340927,-6.262501,"",31
+"dublin_bikes","2025-10-26 00:15:00","1",16,15,true,true,true,"CLARENDON ROW","","Clarendon Row",53.340927,-6.262501,"",31
+"dublin_bikes","2025-10-26 00:25:00","1",16,15,true,true,true,"CLARENDON ROW","","Clarendon Row",53.340927,-6.262501,"",31
+"dublin_bikes","2025-10-26 00:35:00","1",16,15,true,true,true,"CLARENDON ROW","","Clarendon Row",53.340927,-6.262501,"",31
+"dublin_bikes","2025-10-26 00:45:00","1",16,15,true,true,true,"CLARENDON ROW","","Clarendon Row",53.340927,-6.262501,"",31
+"dublin_bikes","2025-10-26 00:55:00","1",16,15,true,true,true,"CLARENDON ROW","","Clarendon Row",53.340927,-6.262501,"",31
+"dublin_bikes","2025-10-26 01:05:00","1",16,15,true,true,true,"CLARENDON ROW","","Clarendon Row",53.340927,-6.262501,"",31

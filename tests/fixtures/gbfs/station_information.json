@@ -1,0 +1,33 @@
+{
+ "last_updated": 1792075100,
+ "ttl": 300,
+ "version": "2.3",
+ "data": {
+  "stations": [
+   {
+    "station_id": "1",
+    "name": "CLARENDON ROW",
+    "lat": 53.340927,
+    "lon": -6.262501,
+    "address": "Clarendon Row",
+    "capacity": 31
+   },
+   {
+    "station_id": "2",
+    "name": "BLESSINGTON STREET",
+    "lat": 53.356769,
+    "lon": -6.26814,
+    "address": "Blessington Street",
+    "capacity": 20
+   },
+   {
+    "station_id": "118",
+    "name": "STATION118",
+    "lat": 53.331384,
+    "lon": -6.265023,
+    "address": "STATION118",
+    "capacity": 40
+   }
+  ]
+ }
+}

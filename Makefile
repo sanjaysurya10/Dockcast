@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down lint typecheck pytest test
+.PHONY: setup db-up db-down backfill collect health lint typecheck pytest test
 
 -include .env
 export
@@ -14,6 +14,15 @@ db-up:
 
 db-down:
 	docker compose down
+
+backfill:
+	uv run python -m dockcast.ingest.historical.backfill
+
+collect:
+	uv run python -m dockcast.ingest.collector
+
+health:
+	uv run python -m dockcast.quality.health
 
 lint:
 	uv run ruff check .

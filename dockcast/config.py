@@ -24,6 +24,16 @@ class EnvSettings(BaseSettings):
     archive_bucket_url: str = ""
     api_cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
+    contact_email: str = ""
+    data_dir: Path = PROJECT_ROOT / "data"
+
+    @property
+    def user_agent(self) -> str:
+        """User-Agent sent to data sources (PRD 21): ``DockCast/<version> (<contact>)``."""
+        from dockcast import __version__
+
+        contact = f" ({self.contact_email})" if self.contact_email else ""
+        return f"DockCast/{__version__}{contact}"
 
     @property
     def cors_origins(self) -> list[str]:
@@ -84,6 +94,7 @@ class CityConfig(BaseModel):
     centre_lon: float = Field(ge=-180, le=180)
     default_zoom: float
     gbfs_root_url: str = ""
+    ckan_package_url: str = ""
 
 
 def _read_toml(path: Path) -> dict[str, object]:

@@ -1,0 +1,72 @@
+{
+ "last_updated": 1792075100,
+ "ttl": 1,
+ "version": "2.3",
+ "data": {
+  "stations": [
+   {
+    "station_id": "1",
+    "num_bikes_available": 8,
+    "vehicle_types_available": [
+     {
+      "vehicle_type_id": "mechanical",
+      "count": 5
+     },
+     {
+      "vehicle_type_id": "electrical",
+      "count": 3
+     }
+    ],
+    "num_bikes_disabled": 0,
+    "num_docks_available": 23,
+    "num_docks_disabled": 0,
+    "is_installed": true,
+    "is_renting": true,
+    "is_returning": true,
+    "last_reported": 1792029806
+   },
+   {
+    "station_id": "2",
+    "num_bikes_available": 0,
+    "vehicle_types_available": [
+     {
+      "vehicle_type_id": "mechanical",
+      "count": 0
+     },
+     {
+      "vehicle_type_id": "electrical",
+      "count": 0
+     }
+    ],
+    "num_bikes_disabled": 0,
+    "num_docks_available": 20,
+    "num_docks_disabled": 0,
+    "is_installed": true,
+    "is_renting": true,
+    "is_returning": true,
+    "last_reported": 1792029800
+   },
+   {
+    "station_id": "118",
+    "num_bikes_available": 0,
+    "vehicle_types_available": [
+     {
+      "vehicle_type_id": "mechanical",
+      "count": 0
+     },
+     {
+      "vehicle_type_id": "electrical",
+      "count": 0
+     }
+    ],
+    "num_bikes_disabled": 0,
+    "num_docks_available": 0,
+    "num_docks_disabled": 0,
+    "is_installed": false,
+    "is_renting": false,
+    "is_returning": false,
+    "last_reported": 1450155600
+   }
+  ]
+ }
+}
