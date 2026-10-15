@@ -386,7 +386,7 @@ CREATE TABLE station_status_raw (
   PRIMARY KEY (station_key, observed_at)
 );
 CREATE INDEX ON station_status_raw (observed_at);
--- Retention: keep live raw rows 30 days in Postgres; archive older to Parquet (Section 18.4)
+-- Retention: keep live raw rows 7 days in the hosted Postgres; archive older to Parquet (Section 18.4)
 
 CREATE TABLE station_status_15m (
   station_key      bigint NOT NULL REFERENCES stations,
@@ -963,9 +963,21 @@ LOG_LEVEL=INFO
 ```
 No secrets in git. `pydantic-settings` validates at startup and fails fast.
 
+**Approved cloud setup (owner decision 2026-10-15; build right after `m1`, before M2):**
+
+| Part | Choice | Verified limits (2026-10-15) |
+|---|---|---|
+| Collector worker | Oracle Cloud Always Free, Ampere A1 VM (1 OCPU / 6 GB), Docker + systemd | A1 = 2 OCPU / 12 GB total; 200 GB block storage; idle VMs may be reclaimed (7-day p95 CPU, network, memory < 20%) — https://docs.oracle.com/en-us/iaas/Content/FreeTier/resourceref.htm. Upgrading to Pay-As-You-Go reportedly avoids reclamation (secondary source only). |
+| Hosted Postgres | Supabase free project (EU region) | 500 MB database, shared CPU / 500 MB RAM, paused after 1 week without activity — https://supabase.com/pricing |
+| Raw archive | Cloudflare R2 | 10 GB-month, 1 M class A, 10 M class B ops free, no egress fees — https://developers.cloudflare.com/r2/pricing |
+| Fallback | GitHub Actions cron every 5 min (off-peak minute); polls once only if the newest `collector_runs` row is > 3 min old | Free for public repos on standard runners — https://docs.github.com/en/billing/concepts/product-billing/github-actions; schedules may be delayed and are disabled after 60 days of repo inactivity |
+| Rejected | Neon free (100 CU-h/project/month, suspend after 5 min idle — a per-minute writer needs ≈ 180 CU-h) — https://neon.com/pricing; Fly.io (no free tier for new orgs, shared-cpu-1x 256 MB $2.19/month) — https://docs.fly.io/about/pricing | |
+
+Accounts (Oracle Cloud, Supabase, Cloudflare) and GitHub secrets are created by the owner, never by the builder.
+
 ### 18.4 Data retention
 
-Raw live rows in Postgres: 30 days → nightly job exports to Parquet (partitioned by date) → archive bucket → delete from Postgres. 15-min table: keep all.
+Raw live rows in the hosted Postgres: **7 days** (owner decision 2026-10-15; was 30 days, which at ≈ 22 MB/day does not fit Supabase's 500 MB free database) → nightly job exports to Parquet (partitioned by date) → Cloudflare R2 → delete from Postgres. Hosted 15-min table: recent window only (enough for the 7-day seasonal lag); the full history (Format A/B, 19.9 M raw rows) stays in the local research DB, where training runs.
 
 ### 18.5 CI/CD (GitHub Actions)
 
@@ -1075,7 +1087,7 @@ Resolve during M1 (unless noted); write the answer and source link next to each 
   7. Cloud collector (always-on worker + hosted Postgres, GitHub Actions 5-min fallback) is set up right after `m1`, before M2; the owner creates all accounts.
 - [ ] MapLibre GL JS minimum version with globe projection (M13).
 - [ ] Basemap tile provider terms and attribution (M13).
-- [ ] Free-tier limits of chosen hosting providers (M17).
+- [x] Free-tier limits of chosen hosting providers (M17). **2026-10-15:** collector/DB/archive/fallback limits checked and recorded in 18.2 (cloud collector moved ahead of M2 by owner decision). API/frontend hosts still to check in M17.
 - [x] Station count and real storage estimate (M1).
   **2026-10-15:** live feed 115 stations (113 installed); history 116 legacy IDs (114 exact matches, 2 new: 92 Heuston Bridge (North), 507 Oriel Street Test Terminal). Backfill = 19,909,798 rows (A 4,759,858; B 15,149,940); `station_status_raw` = 2,677 MB incl. indexes (≈ 135 B/row). Live: 115 × 1,440 = 165,600 rows/day ≈ 22 MB/day → ≈ 0.67 GB for the 30-day retention window. 15-min grid ≈ 11,040 rows/day. Implication for M17: the raw history does not fit typical free-tier Postgres; keep raw history local/Parquet and ship only the 15-min table to prod.
   **Reconciliation finding:** legacy ID 34 is "PORTOBELLO HARBOUR" in history but "LENNOX STREET" (114 m away) in the live feed; the exact-ID-first rule (9.2 step 4) merges them. Six other exact matches are 35–51 m apart with identical names (likely coordinate updates). **Owner decision 2026-10-15:** keep the exact-ID-first rule as written; ID 34 stays merged, with the warning kept in `reports/data_profile.md`.
