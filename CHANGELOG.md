@@ -26,6 +26,8 @@
   (`dockcast/evaluation/splits.py`).
 - Monthly backfill: `make backfill-new` loads only newly published months, merges into
   `reports/data_profile.json`/`.md` and refreshes gaps.
+- CI: removed the placeholder web job (job-level `hashFiles()` made the workflow invalid);
+  it returns in M13.
 
 ## M0 — Scaffold (2026-10-15)
 
@@ -35,4 +37,4 @@
 - docker-compose Postgres 16; Alembic baseline revision `0001` (empty — schema lands in M1).
 - pytest with `unit`/`leakage`/`integration`/`api` markers; integration test runs migrations
   up/down against a Postgres testcontainer.
-- GitHub Actions `ci.yml` (Python job; web job activates once `web/` exists in M13).
+- GitHub Actions `ci.yml` (Python job; web job is added in M13).
