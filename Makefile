@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down backfill collect health lint typecheck pytest test
+.PHONY: setup db-up db-down backfill backfill-new gaps collect health lint typecheck pytest test
 
 -include .env
 export
@@ -17,6 +17,12 @@ db-down:
 
 backfill:
 	uv run python -m dockcast.ingest.historical.backfill
+
+backfill-new:
+	uv run python -m dockcast.ingest.historical.monthly
+
+gaps:
+	uv run python -m dockcast.quality.gaps
 
 collect:
 	uv run python -m dockcast.ingest.collector

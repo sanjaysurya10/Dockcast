@@ -1,6 +1,7 @@
 """Per-file profiling of historical data (PRD 5.3) and the ``reports/data_profile.md`` writer."""
 
-from dataclasses import asdict, dataclass
+import json
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from pathlib import Path
 
@@ -167,3 +168,45 @@ def write_report(text: str, path: Path) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def save_profiles(path: Path, profiles: list[FileProfile], notes: list[str]) -> None:
+    """Persist profiles and reconciliation notes as JSON (input to incremental reports).
+
+    Args:
+        path: JSON destination.
+        profiles: File profiles.
+        notes: Reconciliation warnings.
+    """
+    payload = {
+        "profiles": [
+            {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in asdict(p).items()}
+            for p in sorted(profiles, key=lambda p: p.file_name)
+        ],
+        "reconciliation_notes": notes,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+
+
+def load_profiles(path: Path) -> tuple[list[FileProfile], list[str]]:
+    """Read profiles saved by :func:`save_profiles`; empty if the file does not exist.
+
+    Args:
+        path: JSON path.
+
+    Returns:
+        Profiles and reconciliation notes.
+    """
+    if not path.exists():
+        return [], []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    names = {f.name for f in fields(FileProfile)}
+    profiles = []
+    for item in payload["profiles"]:
+        values = {k: v for k, v in item.items() if k in names}
+        for key in ("min_ts", "max_ts"):
+            if values.get(key):
+                values[key] = datetime.fromisoformat(values[key])
+        profiles.append(FileProfile(**values))
+    return profiles, list(payload.get("reconciliation_notes", []))

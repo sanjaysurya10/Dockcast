@@ -246,6 +246,18 @@ class CollectorRun(CreatedAtMixin, Base):
     feed_last_updated: Mapped[datetime | None] = mapped_column(TZ)
 
 
+class DataGap(CreatedAtMixin, Base):
+    """A network-wide period without observations (PRD 9.8)."""
+
+    __tablename__ = "data_gaps"
+
+    gap_start: Mapped[datetime] = mapped_column(TZ, primary_key=True)  # last obs before
+    gap_end: Mapped[datetime] = mapped_column(TZ)  # first obs after
+    source_before: Mapped[str] = mapped_column(Text)
+    source_after: Mapped[str] = mapped_column(Text)
+    duration_s: Mapped[int] = mapped_column(BigInteger)
+
+
 class DataQualityFile(CreatedAtMixin, Base):
     """Profile of one historical file."""
 

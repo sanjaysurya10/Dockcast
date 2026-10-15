@@ -16,6 +16,16 @@
   `data_quality_files` + `reports/data_profile.md`.
 - `make health`: collector uptime over the last 24 h (PRD S5).
 - PRD §23: D1, D2, trip data, D4 and D5 resolved with sources.
+- Owner decisions on M1 findings recorded (PRD 9.1a, 9.2, 9.8, 10.3, 13.1, 14, 17, 23):
+  Format B + collector for main models, Format A only for E3/E8; M10 needs ≥ 12 weeks of
+  collector data.
+- Data gaps: `data_gaps` table (migration `0004`), `make gaps`, `reports/data_gaps.md`
+  (38 gaps from the real data).
+- Gap-aware lag/rolling helpers (`dockcast/features/lags.py`) with unit + leakage tests; gap-free
+  rolling-origin folds ending at the last complete month of Format B
+  (`dockcast/evaluation/splits.py`).
+- Monthly backfill: `make backfill-new` loads only newly published months, merges into
+  `reports/data_profile.json`/`.md` and refreshes gaps.
 
 ## M0 — Scaffold (2026-10-15)
 

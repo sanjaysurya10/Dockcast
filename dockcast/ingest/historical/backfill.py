@@ -1,7 +1,7 @@
 """Backfill historical CSVs into ``station_status_raw`` and profile them (PRD 9.2)."""
 
 import io
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -27,7 +27,14 @@ from dockcast.ingest.historical.formats import detect_format, read_header
 from dockcast.ingest.historical.loader_format_a import load_format_a
 from dockcast.ingest.historical.loader_format_b import load_format_b
 from dockcast.ingest.historical.reconcile import KnownStation, legacy_stations, reconcile
-from dockcast.quality.profile import FileProfile, profile_frame, render_report, write_report
+from dockcast.quality.profile import (
+    FileProfile,
+    load_profiles,
+    profile_frame,
+    render_report,
+    save_profiles,
+    write_report,
+)
 
 log = structlog.get_logger(job="backfill")
 
@@ -202,14 +209,69 @@ def copy_raw_rows(engine: Engine, df: pd.DataFrame) -> int:
             return int(cur.rowcount)
 
 
+def load_into_db(
+    path: Path, engine: Engine, city: CityConfig, notes: list[str], now: datetime
+) -> FileProfile:
+    """Load one CSV into ``station_status_raw`` and record its ``data_quality_files`` row.
+
+    Args:
+        path: CSV path.
+        engine: Database engine.
+        city: City configuration.
+        notes: Reconciliation warnings are appended here.
+        now: Profiling timestamp.
+
+    Returns:
+        The file profile.
+    """
+    df, profile = load_file(path)
+    with Session(engine) as session:
+        if not df.empty:
+            keys = map_station_keys(session, city.city_code, df, notes)
+            session.commit()
+            df = df.assign(station_key=df["source_id"].map(keys).astype("int64"))
+            inserted = copy_raw_rows(engine, df)
+            log.info("loaded", file=path.name, rows=len(df), inserted=inserted)
+        row = profile.db_row(now)
+        stmt = insert(DataQualityFile).values(row)
+        session.execute(
+            stmt.on_conflict_do_update(
+                index_elements=[DataQualityFile.file_name],
+                set_={k: stmt.excluded[k] for k in row if k != "file_name"},
+            )
+        )
+        session.commit()
+    return profile
+
+
+def in_scope_files(hist_dir: Path) -> list[Path]:
+    """Monthly format A/B CSVs present in ``hist_dir``, sorted by name.
+
+    Args:
+        hist_dir: Directory of downloaded CSVs.
+
+    Returns:
+        Matching paths.
+    """
+    return sorted(
+        p
+        for p in hist_dir.glob("*.csv")
+        if FORMAT_A_FILE.match(p.name) or FORMAT_B_FILE.match(p.name)
+    )
+
+
 def backfill(
     hist_dir: Path,
     engine: Engine,
     city: CityConfig,
     client: httpx.Client,
     report_path: Path = PROJECT_ROOT / "reports" / "data_profile.md",
+    files: Sequence[Path] | None = None,
 ) -> list[FileProfile]:
-    """Load every in-scope CSV in ``hist_dir`` and write the profile report.
+    """Load CSVs and update the profile report.
+
+    Profiles are merged into ``<report>.json`` by file name, so loading only new months keeps
+    the rows of earlier files in the report.
 
     Args:
         hist_dir: Directory of downloaded CSVs.
@@ -217,49 +279,34 @@ def backfill(
         city: City configuration.
         client: HTTP client used to seed stations from the live feed.
         report_path: Where to write the markdown report.
+        files: Files to load; defaults to every in-scope file in ``hist_dir``.
 
     Returns:
-        Profiles of all files.
+        Profiles of the files loaded in this run.
     """
     now = datetime.now(UTC)
     backoff = load_project_config().collector.retry_backoff_s
     with Session(engine) as session:
         sync_station_information(session, client, city, backoff, now)
         session.commit()
-    files = sorted(
-        p
-        for p in hist_dir.glob("*.csv")
-        if FORMAT_A_FILE.match(p.name) or FORMAT_B_FILE.match(p.name)
-    )
-    profiles: list[FileProfile] = []
     notes: list[str] = []
-    for path in files:
-        df, profile = load_file(path)
-        profiles.append(profile)
-        with Session(engine) as session:
-            if not df.empty:
-                keys = map_station_keys(session, city.city_code, df, notes)
-                session.commit()
-                df = df.assign(station_key=df["source_id"].map(keys).astype("int64"))
-                inserted = copy_raw_rows(engine, df)
-                log.info("loaded", file=path.name, rows=len(df), inserted=inserted)
-            row = profile.db_row(now)
-            stmt = insert(DataQualityFile).values(row)
-            session.execute(
-                stmt.on_conflict_do_update(
-                    index_elements=[DataQualityFile.file_name],
-                    set_={k: stmt.excluded[k] for k in row if k != "file_name"},
-                )
-            )
-            session.commit()
+    loaded = [
+        load_into_db(path, engine, city, notes, now)
+        for path in (files if files is not None else in_scope_files(hist_dir))
+    ]
+    store = report_path.with_suffix(".json")
+    previous, previous_notes = load_profiles(store)
+    merged = {p.file_name: p for p in previous} | {p.file_name: p for p in loaded}
+    all_notes = list(dict.fromkeys([*previous_notes, *notes]))
+    save_profiles(store, list(merged.values()), all_notes)
     out_of_scope = [r.name for r in list_resources(city.ckan_package_url, client) if not r.in_scope]
     with Session(engine) as session:
         methods = session.execute(
             text("SELECT method, count(*) FROM station_id_map GROUP BY method ORDER BY method")
         ).all()
-    summary = [f"{method}: {count} legacy IDs" for method, count in methods] + notes
-    write_report(render_report(profiles, out_of_scope, summary, now), report_path)
-    return profiles
+    summary = [f"{method}: {count} legacy IDs" for method, count in methods] + all_notes
+    write_report(render_report(list(merged.values()), out_of_scope, summary, now), report_path)
+    return loaded
 
 
 def main() -> None:

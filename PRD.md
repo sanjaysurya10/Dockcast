@@ -522,6 +522,24 @@ CREATE TABLE data_quality_files (
 4. Reconcile station IDs (`reconcile.py`): exact ID match, else name + coordinates within 30 m, else new station with a warning.
 5. Profile every file → `data_quality_files` + `reports/data_profile.md`.
 6. Bulk load with `COPY`.
+7. **Monthly backfill** (owner decision 2026-10-15): `make backfill-new` re-reads the listing, downloads and loads only in-scope months that are not yet in `data_quality_files`, updates the profile report, and recomputes the data-gap table (9.8). Scheduled monthly (day 5, 06:00 UTC) once the cloud setup exists (Section 18).
+
+### 9.1a Training data scope **[DECISION 2026-10-15]**
+
+| Source | Interval per station | Used for |
+|---|---|---|
+| Format B (May 2024 →) | ~10 min | Main models M3–M12: training and backtesting |
+| Collector (`live`, Oct 2026 →) | 1 min (5 min in fallback) | Main models; **only** source for event labels (11.2) |
+| Format A (Oct 2021 – Feb 2024) | 30 min | **Only** E3 clustering and E8 drift; never in M3–M12 training/backtests |
+
+Rationale: Format A's 30-min snapshots leave every other 15-min bucket empty (half the targets would be imputed and excluded); the March–April 2024 hole separates it from B.
+
+### 9.8 Data gaps (owner decision 2026-10-15)
+
+- A **data gap** is a network-wide period in which no station has any observation for longer than the source's threshold: **30 min** for Format B and live data, **60 min** for Format A. Every gap is stored in `data_gaps` (`gap_start` = last observation before, `gap_end` = first observation after, `source_before`, `source_after`, `duration`) and listed in `reports/data_gaps.md`, including the gap between the end of Format B and the collector start (July 2026 → collector start) and the March–April 2024 hole.
+- `make gaps` recomputes the table from `station_status_raw`; the monthly backfill and the collector health job call it.
+- Lag and rolling features return **NaN** when any source timestamp they read falls inside a gap (10.3). Gap-crossing values are never forward-filled.
+- Backtest test windows must not overlap a gap (13.1).
 
 ### 9.3 Cleaning rules
 
@@ -557,6 +575,8 @@ CREATE TABLE data_quality_files (
 make setup        # uv sync, pre-commit install, npm ci in web/
 make db-up        # docker compose up -d postgres; alembic upgrade head
 make backfill     # download + load historical CSVs + profile report
+make backfill-new # load newly published months only (9.2 step 7)
+make gaps         # recompute data_gaps + reports/data_gaps.md (9.8)
 make weather      # load weather history; fetch current forecast
 make collect      # run collector loop locally
 make resample     # rebuild station_status_15m (incremental by default)
@@ -587,6 +607,8 @@ Every feature function receives `cutoff: datetime` and a test asserts no row aft
 `hour_local`, `minute_of_day` (sin/cos), `dow` (sin/cos), `is_weekend`, `is_public_holiday`, `is_school_term`, `is_uni_term`, `days_to_next_holiday`, `month` (sin/cos).
 
 ### 10.3 Lag and rolling (per station, from `bikes_last` ratio = bikes / capacity, plus raw count)
+
+Gap rule (9.8): a lag or rolling value is NaN if any bucket it reads lies inside a data gap; a unit and a leakage test cover this (`tests/unit/test_lags.py`, `tests/leakage/test_lags_cutoff.py`).
 
 - Lags: 1, 2, 3, 4, 8 buckets (15 to 120 min).
 - Seasonal lags: same bucket 1 day ago, 7 days ago.
@@ -685,7 +707,9 @@ The champion per horizon is the model with the lowest mean MAE across folds **an
 
 - Folds: **8**. Each test window: **7 days**. Training: expanding window, all data before the test window.
 - **Gap:** 120 min between the end of training and the start of test (max horizon) to stop label overlap.
-- Test windows spread over the last 8 weeks of available data by default; E8 uses windows across seasons.
+- Data: Format B + collector only (9.1a); Format A is excluded except in E3/E8.
+- Test windows are 8 consecutive weeks that **end at the last complete calendar month of Format B data** by default (currently 2026-06-30 23:59 UTC); E8 uses windows across seasons.
+- **No test window may overlap a data gap (9.8):** walking back from the end, a window that would overlap a gap is moved to end at the gap's start. The resulting fold dates are saved in `reports/folds.json`.
 - Hyperparameter tuning only inside training data (inner validation = last week of training).
 - Same folds for every model in an experiment (folds are saved to `reports/folds.json`).
 
@@ -727,12 +751,12 @@ Each experiment = one script in `dockcast/experiments/`, one MLflow experiment, 
 |---|---|---|---|---|
 | E1 | v1 | ML vs baselines | persistence, seasonal naive, ridge, lgbm_global; all horizons | Results table + MASE |
 | E2 | v2 | Global vs per-station vs per-cluster | Same features; compare overall and for low-data stations (bottom quartile by rows) | Table + chart |
-| E3 | v2 | Station behaviour groups | Weekday & weekend 24-h occupancy profiles (normalised by capacity) → k-means (k = 3–8, silhouette + stability across folds) and hierarchical (Ward); map clusters | Cluster map, profiles, stability score |
+| E3 | v2 | Station behaviour groups | Format A + B (9.1a). Weekday & weekend 24-h occupancy profiles (normalised by capacity) → k-means (k = 3–8, silhouette + stability across folds) and hierarchical (Ward); map clusters | Cluster map, profiles, stability score |
 | E4 | v2 | Spatial features | Model A (no spatial) vs B (+spatial), radii 400/600/800 m | Δ MAE by slice |
 | E5 | v2 | Risk classifier vs rule | lgbm_event vs rule baseline vs "p10 of regression ≤ 0" | PR-AUC, Brier, reliability |
 | E6 | v2 | Uncertainty quality | Coverage and width by horizon, hour, cluster | Calibration table |
 | E7 | v2 | Ablation | Remove one feature group at a time; also oracle vs forecast weather | Δ MAE table |
-| E8 | v3 | Drift + retraining | Fixed model vs weekly retrain vs rolling 12-week window across ≥ 6 months | MAE over time chart |
+| E8 | v3 | Drift + retraining | Format A + B + collector (9.1a), gaps excluded. Fixed model vs weekly retrain vs rolling 12-week window across ≥ 6 months | MAE over time chart |
 | E9 | v3+ (optional) | Rebalancing simulation | Simple greedy policy using forecasts vs no-action vs persistence-based policy; objective = stockout-minutes avoided − λ·moves | Simulation report, clearly labelled as simulation |
 
 ---
@@ -889,7 +913,7 @@ Each milestone ends with: tests green, `reports/` updated, a short entry in `CHA
 | M7 | Station clustering (E3) | Clusters stable across folds (report adjusted Rand index); cluster map + profiles |
 | M8 | Spatial features (E4) | Δ MAE reported per slice; leakage tests extended to spatial |
 | M9 | Global vs per-station vs cluster + Prophet (E2) | Comparison table incl. low-data stations |
-| M10 | Event classifiers (E5) | Calibrated probabilities; reliability plot; beats or honestly fails vs rule baseline |
+| M10 | Event classifiers (E5) | Calibrated probabilities; reliability plot; beats or honestly fails vs rule baseline. **Prerequisite: ≥ 12 weeks of collector data** (event labels are collector-only, 11.2 / 9.1a) |
 | M11 | Uncertainty study (E6) + ablation (E7) incl. forecast vs oracle weather | Reports generated |
 | M12 | Full error analysis + v2 release | `reports/error_analysis.md` answers all 13.4 questions; tag `v2.0.0` |
 
@@ -1041,6 +1065,14 @@ Resolve during M1 (unless noted); write the answer and source link next to each 
   **2026-10-15:** Met Éireann hourly station data, e.g. Dublin Airport (532) `https://clidata.met.ie/cli/climate_data/webdata/hly532.csv` (fetched OK; timestamps "Date and Time (utc)"; latest row 2026-10-01 00:00; wind in knots, cloud amount in oktas) and Phoenix Park (175) `hly175.csv`. Licence CC BY 4.0, attribution to Met Éireann required (https://data.gov.ie/dataset/dublin-airport-hourly-data). The older host `cli.fusio.net` was unreachable. Station choice is made in M2.
 - [x] `holidays` package coverage for IE (D5).
   **2026-10-15:** `holidays` 0.106, `country_holidays("IE")` returns 9–10 days/year incl. St Brigid's Day (from 2023) and the one-off 2022-03-18 Day of Remembrance and Recognition.
+- **Owner decisions on M1 findings (2026-10-15):**
+  1. Training data: main models (M3–M12) train/backtest on Format B + collector only; Format A only for E3 and E8 → 9.1a, 13.1, 14.
+  2. Data gaps: gap table with every missing period (incl. Jul 2026 → collector start); lag/rolling features NaN when reading a gap; test windows never overlap a gap and by default end at the last complete month of Format B → 9.8, 10.3, 13.1.
+  3. Monthly backfill job for newly published months → 9.2 step 7.
+  4. Event labels collector-only confirmed; M10 needs ≥ 12 weeks of collector data → 17.
+  5. `m1` is tagged only after `make health` shows ≥ 95% uptime over a full 24 h window.
+  6. Public repo `https://github.com/sanjaysurya10/Dockcast`; CI must be green.
+  7. Cloud collector (always-on worker + hosted Postgres, GitHub Actions 5-min fallback) is set up right after `m1`, before M2; the owner creates all accounts.
 - [ ] MapLibre GL JS minimum version with globe projection (M13).
 - [ ] Basemap tile provider terms and attribution (M13).
 - [ ] Free-tier limits of chosen hosting providers (M17).
