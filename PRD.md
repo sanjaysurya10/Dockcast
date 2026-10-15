@@ -1046,7 +1046,7 @@ Resolve during M1 (unless noted); write the answer and source link next to each 
 - [ ] Free-tier limits of chosen hosting providers (M17).
 - [x] Station count and real storage estimate (M1).
   **2026-10-15:** live feed 115 stations (113 installed); history 116 legacy IDs (114 exact matches, 2 new: 92 Heuston Bridge (North), 507 Oriel Street Test Terminal). Backfill = 19,909,798 rows (A 4,759,858; B 15,149,940); `station_status_raw` = 2,677 MB incl. indexes (≈ 135 B/row). Live: 115 × 1,440 = 165,600 rows/day ≈ 22 MB/day → ≈ 0.67 GB for the 30-day retention window. 15-min grid ≈ 11,040 rows/day. Implication for M17: the raw history does not fit typical free-tier Postgres; keep raw history local/Parquet and ship only the 15-min table to prod.
-  **Reconciliation finding (needs owner decision):** legacy ID 34 is "PORTOBELLO HARBOUR" in history but "LENNOX STREET" (114 m away) in the live feed; the exact-ID-first rule (9.2 step 4) merges them. Six other exact matches are 35–51 m apart with identical names (likely coordinate updates).
+  **Reconciliation finding:** legacy ID 34 is "PORTOBELLO HARBOUR" in history but "LENNOX STREET" (114 m away) in the live feed; the exact-ID-first rule (9.2 step 4) merges them. Six other exact matches are 35–51 m apart with identical names (likely coordinate updates). **Owner decision 2026-10-15:** keep the exact-ID-first rule as written; ID 34 stays merged, with the warning kept in `reports/data_profile.md`.
 
 ---
 
