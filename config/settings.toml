@@ -1,0 +1,23 @@
+# Non-secret project configuration. Values mirror PRD decisions; change only with owner approval.
+
+[forecast]
+horizons_min = [30, 60, 120]          # PRD 1, 11.1
+quantiles = [0.1, 0.5, 0.9]           # PRD G1
+bucket_min = 15                       # PRD 9.4
+event_window_min = 60                 # PRD 11.2
+
+[backtest]
+n_folds = 8                           # PRD 13.1 [DECISION]
+test_window_days = 7
+gap_min = 120
+
+[spatial]
+neighbour_k = 5                       # PRD 10.5
+neighbour_radius_m = 600
+
+[collector]
+poll_interval_s = 60                  # PRD 9.1
+station_info_refresh_h = 24
+request_timeout_s = 10
+retry_backoff_s = [1, 4, 16]
+stale_after_min = 15

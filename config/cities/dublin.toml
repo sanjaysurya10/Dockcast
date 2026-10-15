@@ -1,0 +1,9 @@
+city_code = "dublin"
+name = "Dublin"
+timezone = "Europe/Dublin"
+# Approximate city centre (O'Connell Bridge) used only for the initial map camera.
+centre_lat = 53.3473
+centre_lon = -6.2591
+default_zoom = 13.0
+# [VERIFY in M1] Discover from the data.gov.ie listing; PRD 5.1 D1. Overridable via GBFS_ROOT_URL.
+gbfs_root_url = ""
