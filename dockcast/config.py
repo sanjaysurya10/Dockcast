@@ -75,6 +75,12 @@ class CollectorConfig(BaseModel):
     stale_after_min: int
 
 
+class RetentionConfig(BaseModel):
+    """Raw-data retention in the hosted database (PRD 18.4)."""
+
+    raw_live_days: int = Field(ge=1)
+
+
 class ProjectConfig(BaseModel):
     """Contents of `config/settings.toml`."""
 
@@ -82,6 +88,7 @@ class ProjectConfig(BaseModel):
     backtest: BacktestConfig
     spatial: SpatialConfig
     collector: CollectorConfig
+    retention: RetentionConfig
 
 
 class CityConfig(BaseModel):

@@ -1,0 +1,9 @@
+[Unit]
+Description=DockCast nightly archive of live raw rows (PRD 18.4)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=REPO_DIR=/opt/dockcast
+ExecStart=/opt/dockcast/deploy/oracle/archive.sh

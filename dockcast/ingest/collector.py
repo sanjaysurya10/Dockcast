@@ -1,14 +1,16 @@
 """Live collector: poll GBFS ``station_status`` every minute and store raw rows (PRD 9.1)."""
 
+import argparse
 import gzip
 import json
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
 import structlog
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from dockcast.config import (
@@ -227,22 +229,79 @@ class Collector:
             self._sleep(interval - (now % interval))
 
 
-def main() -> None:
-    """Entry point for ``make collect``."""
+def last_successful_poll(session: Session, city_code: str) -> datetime | None:
+    """Start time of the newest ``ok``/``partial`` run for a city.
+
+    Args:
+        session: Open session.
+        city_code: City code.
+
+    Returns:
+        The timestamp, or ``None`` if there has been no successful run.
+    """
+    return session.scalar(
+        select(func.max(CollectorRun.started_at)).where(
+            CollectorRun.city_code == city_code, CollectorRun.status.in_(("ok", "partial"))
+        )
+    )
+
+
+def primary_is_stale(last_poll: datetime | None, now: datetime, stale_after: timedelta) -> bool:
+    """Whether the fallback should poll: no successful run within ``stale_after``.
+
+    Args:
+        last_poll: Newest successful run, if any.
+        now: Current time (UTC).
+        stale_after: Allowed silence of the primary worker.
+
+    Returns:
+        ``True`` if the fallback should poll.
+    """
+    return last_poll is None or now - last_poll > stale_after
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Command-line options for the collector.
+
+    Args:
+        argv: Arguments (defaults to ``sys.argv[1:]``).
+
+    Returns:
+        Parsed options.
+    """
+    parser = argparse.ArgumentParser(description="Poll the live GBFS feed (PRD 9.1).")
+    parser.add_argument("--once", action="store_true", help="poll once and exit")
+    parser.add_argument(
+        "--if-stale-min",
+        type=float,
+        default=None,
+        help="with --once: poll only if no successful run in the last N minutes (fallback)",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Entry point for ``make collect`` and the GitHub Actions fallback."""
+    args = parse_args(argv)
     settings = get_env_settings()
     city = load_city_config(settings.city)
     config = load_project_config().collector
+    sessions = make_session_factory(make_engine())
+    if args.once and args.if_stale_min is not None:
+        with sessions() as session:
+            last = last_successful_poll(session, city.city_code)
+        if not primary_is_stale(last, utc_now(), timedelta(minutes=args.if_stale_min)):
+            log.info("primary_healthy_skip", last_poll=str(last))
+            return
+        log.warning("primary_stale_fallback_poll", last_poll=str(last))
     client = httpx.Client(
         headers={"User-Agent": settings.user_agent}, timeout=config.request_timeout_s
     )
-    collector = Collector(
-        make_session_factory(make_engine()),
-        client,
-        city,
-        config,
-        settings.data_dir / "raw" / "gbfs",
-    )
-    collector.run_forever()
+    collector = Collector(sessions, client, city, config, settings.data_dir / "raw" / "gbfs")
+    if args.once:
+        collector.poll_once()
+    else:
+        collector.run_forever()
 
 
 if __name__ == "__main__":

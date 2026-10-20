@@ -15,5 +15,21 @@ services:
       timeout: 5s
       retries: 30
 
+  # Long-running collector; survives terminal/app restarts. Start with `make collector-up`.
+  collector:
+    build: .
+    profiles: ["collector"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://dockcast:dockcast@postgres:5432/dockcast
+      CITY: ${CITY:-dublin}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+      DATA_DIR: /app/data
+    volumes:
+      - ./data/raw/gbfs:/app/data/raw/gbfs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:

@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the DockCast archive job nightly
+
+[Timer]
+OnCalendar=*-*-* 02:17:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

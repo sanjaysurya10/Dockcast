@@ -21,3 +21,6 @@ station_info_refresh_h = 24
 request_timeout_s = 10
 retry_backoff_s = [1, 4, 16]
 stale_after_min = 15
+
+[retention]
+raw_live_days = 7                     # PRD 18.4 (owner decision 2026-10-15)

@@ -26,6 +26,13 @@
   (`dockcast/evaluation/splits.py`).
 - Monthly backfill: `make backfill-new` loads only newly published months, merges into
   `reports/data_profile.json`/`.md` and refreshes gaps.
+- Collector container: `Dockerfile`, compose service `collector` (`restart: unless-stopped`),
+  `make collector-up/-down/-logs`. The first local 24 h run stopped after ~8 h when the
+  terminal process was killed (2026-10-15 23:24 UTC); the 24 h check restarted 2026-10-20 18:41 UTC.
+- Cloud collector building blocks (PRD 18.2, not deployed): `collector --once --if-stale-min`,
+  fallback workflow `collector.yml` (every 5 min, no-op without `DATABASE_URL` secret),
+  `dockcast.ingest.archive` export/prune (7-day retention, prune verifies Parquet row counts),
+  `deploy/oracle/` (worker compose, nightly archive script + systemd timer, setup guide).
 - CI: removed the placeholder web job (job-level `hashFiles()` made the workflow invalid);
   it returns in M13.
 

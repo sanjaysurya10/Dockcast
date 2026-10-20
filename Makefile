@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down backfill backfill-new gaps collect health lint typecheck pytest test
+.PHONY: setup db-up db-down backfill backfill-new gaps collect collector-up collector-down collector-logs health lint typecheck pytest test
 
 -include .env
 export
@@ -26,6 +26,15 @@ gaps:
 
 collect:
 	uv run python -m dockcast.ingest.collector
+
+collector-up:
+	docker compose --profile collector up -d --build collector
+
+collector-down:
+	docker compose --profile collector stop collector
+
+collector-logs:
+	docker compose --profile collector logs --tail 50 collector
 
 health:
 	uv run python -m dockcast.quality.health

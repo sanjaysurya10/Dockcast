@@ -1,0 +1,18 @@
+# Always-on worker on the Oracle Cloud VM (PRD 18.2). Writes to the hosted Postgres given in
+# deploy/oracle/.env (DATABASE_URL, CONTACT_EMAIL). Run from the repository root:
+#   docker compose -f deploy/oracle/docker-compose.worker.yml --env-file deploy/oracle/.env up -d --build
+services:
+  collector:
+    build:
+      context: ../..
+    env_file: .env
+    environment:
+      DATA_DIR: /app/data
+    volumes:
+      - /var/lib/dockcast/data:/app/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
