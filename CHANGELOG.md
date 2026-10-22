@@ -36,6 +36,8 @@
 - PostgreSQL 17 everywhere (owner decision): compose `postgres:17` on new volume `pgdata17`,
   integration tests default to 17 (`DOCKCAST_TEST_PG_IMAGE` overrides); local DB moved by
   dump/restore with identical row counts.
+- Supabase project `oyfrejzjkhjaohtknbvh` (eu-west-1, Postgres 17.11): schema applied from
+  `alembic upgrade head --sql` (revision `0004`), Data API off, RLS on all 15 tables.
 - CI: removed the placeholder web job (job-level `hashFiles()` made the workflow invalid);
   it returns in M13.
 

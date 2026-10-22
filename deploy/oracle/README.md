@@ -8,12 +8,22 @@ Parquet archive to Cloudflare R2, and a GitHub Actions fallback every 5 min.
 
 1. New project, region **West EU (Ireland)** if offered. Save the database password in your
    password manager.
-2. **Turn off public API access to our tables.** Supabase exposes the `public` schema through its
-   Data API, and DockCast tables have no row-level security. In *Project settings → Data API*,
-   disable the Data API (or remove `public` from *Exposed schemas*).
+2. **Turn off public API access to our tables.** When creating the project: untick *Enable Data
+   API* and *Automatically expose new tables*, tick *Enable automatic RLS* (done 2026-10-22).
+   DockCast only uses a direct Postgres connection.
 3. *Connect* → **Session pooler** connection string (IPv4; the direct host is IPv6-only unless the
-   paid IPv4 add-on is enabled, and Oracle VMs are IPv4 by default). Turn it into:
-   `postgresql+psycopg://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres?sslmode=require`
+   paid IPv4 add-on is enabled, and Oracle VMs are IPv4 by default). For this project
+   (`oyfrejzjkhjaohtknbvh`, eu-west-1) `DATABASE_URL` is:
+
+   ```
+   postgresql+psycopg://postgres.oyfrejzjkhjaohtknbvh:<PASSWORD>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
+   ```
+
+   Replace `<PASSWORD>` with the database password, percent-encoding special characters
+   (`@`→`%40`, `#`→`%23`, `/`→`%2F`, `:`→`%3A`, `?`→`%3F`, `&`→`%26`, `%`→`%25`).
+4. Schema: already created (2026-10-22) from `alembic upgrade head --sql`, revision `0004`; all 15
+   tables owned by `postgres` (bypasses RLS), automatic RLS on with no policies, so Data API roles
+   are denied.
 
 ## 2. Cloudflare R2 (archive)
 
@@ -48,7 +58,7 @@ nano deploy/oracle/.env     # set DATABASE_URL (from step 1.3); optionally CONTA
 cd /opt/dockcast
 C="docker compose -f deploy/oracle/docker-compose.worker.yml --env-file deploy/oracle/.env"
 $C build
-$C run --rm collector alembic upgrade head      # expect: Running upgrade ... -> 0004
+$C run --rm collector alembic current           # expect: 0004 (head) — also proves the URL works
 $C up -d
 $C logs --tail 5 collector                      # expect: poll ... rows=115 status=ok
 ```
