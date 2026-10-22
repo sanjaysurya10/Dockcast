@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: postgres:17
     environment:
       POSTGRES_USER: dockcast
       POSTGRES_PASSWORD: dockcast
@@ -8,7 +8,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata17:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dockcast -d dockcast"]
       interval: 2s
@@ -32,4 +32,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  pgdata:
+  # Postgres 17 (PRD 6.3, owner decision 2026-10-22). The old Postgres 16 volume `pgdata` is
+  # no longer used; delete it only after confirming the restore.
+  pgdata17:

@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterator
 
 import pytest
@@ -10,10 +11,14 @@ from dockcast.config import PROJECT_ROOT
 
 @pytest.fixture(scope="session")
 def postgres_url() -> Iterator[str]:
-    """Start a throwaway Postgres 16 container and yield a psycopg SQLAlchemy URL."""
+    """Start a throwaway Postgres container and yield a psycopg SQLAlchemy URL.
+
+    Defaults to ``postgres:17``; set ``DOCKCAST_TEST_PG_IMAGE`` to test another version.
+    """
     testcontainers_pg = pytest.importorskip("testcontainers.postgres")
     try:
-        container = testcontainers_pg.PostgresContainer("postgres:16", driver="psycopg")
+        image = os.environ.get("DOCKCAST_TEST_PG_IMAGE", "postgres:17")
+        container = testcontainers_pg.PostgresContainer(image, driver="psycopg")
         container.start()
     except Exception as exc:  # Docker not available
         pytest.skip(f"Docker unavailable: {exc}")

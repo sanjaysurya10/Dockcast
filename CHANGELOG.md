@@ -33,6 +33,9 @@
   fallback workflow `collector.yml` (every 5 min, no-op without `DATABASE_URL` secret),
   `dockcast.ingest.archive` export/prune (7-day retention, prune verifies Parquet row counts),
   `deploy/oracle/` (worker compose, nightly archive script + systemd timer, setup guide).
+- PostgreSQL 17 everywhere (owner decision): compose `postgres:17` on new volume `pgdata17`,
+  integration tests default to 17 (`DOCKCAST_TEST_PG_IMAGE` overrides); local DB moved by
+  dump/restore with identical row counts.
 - CI: removed the placeholder web job (job-level `hashFiles()` made the workflow invalid);
   it returns in M13.
 
