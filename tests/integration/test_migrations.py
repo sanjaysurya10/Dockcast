@@ -38,7 +38,7 @@ def _current_revision(url: str) -> str | None:
 def test_migrations_upgrade_and_downgrade(postgres_url: str) -> None:
     config = alembic_config(postgres_url)
     command.upgrade(config, "head")
-    assert _current_revision(postgres_url) == "0004"
+    assert _current_revision(postgres_url) == "0005"
     engine = create_engine(postgres_url)
     assert set(inspect(engine).get_table_names()) >= PRD_TABLES
     engine.dispose()

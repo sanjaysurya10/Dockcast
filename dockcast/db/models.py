@@ -114,6 +114,9 @@ class StationStatus15m(CreatedAtMixin, Base):
     n_obs: Mapped[int] = mapped_column(Integer)
     is_imputed: Mapped[bool] = mapped_column(Boolean, server_default="false")
     is_closed: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    rebalance_flag: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    capacity_mismatch: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    flatline_flag: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
 
 class WeatherHourly(CreatedAtMixin, Base):
@@ -151,8 +154,8 @@ class CalendarDay(CreatedAtMixin, Base):
     date: Mapped[date] = mapped_column(Date, primary_key=True)
     is_public_holiday: Mapped[bool] = mapped_column(Boolean)
     holiday_name: Mapped[str | None] = mapped_column(Text)
-    is_school_term: Mapped[bool] = mapped_column(Boolean)
-    is_uni_term: Mapped[bool] = mapped_column(Boolean)
+    is_school_term: Mapped[bool | None] = mapped_column(Boolean)  # NULL = no sourced dates
+    is_uni_term: Mapped[bool | None] = mapped_column(Boolean)
 
 
 class ModelVersion(CreatedAtMixin, Base):
