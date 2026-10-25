@@ -545,11 +545,13 @@ Rationale: Format A's 30-min snapshots leave every other 15-min bucket empty (ha
 
 | Rule | Action |
 |---|---|
-| `bikes + docks > capacity + 2` | Keep, flag `capacity_mismatch`; update capacity if persistent > 7 days |
+| `bikes + docks > capacity + 2`, capacity **in force at the time** from `station_capacity` change points (owner decision 2026-10-25) | Keep, flag `capacity_mismatch`; capacity history replaces "update capacity if persistent > 7 days" |
 | Negative counts | Drop row, log |
 | Duplicate `(station, observed_at)` | Keep first |
 | `is_renting = false` | Keep row; bucket marked `is_closed`; excluded from training targets |
-| Jump of ≥ 8 bikes within 5 min **[tune in EDA]** | Flag as likely rebalancing (`rebalance_flag`); kept, analysed in E-error |
+| Jump of ≥ 8 bikes within ~~5~~ **10 min** (max − min of bikes in a trailing 10-min window; owner decision 2026-10-25 from `reports/eda.md`) | Flag as likely rebalancing (`rebalance_flag`); kept, analysed in E-error |
+| **Spike** (added 2026-10-25): a single reading ≥ 8 away from both neighbours in the same direction, neighbours ≤ 10 min away (e.g. nightly 03:15 local Format B glitch) | Excluded from 15-min buckets; kept in raw; counted in `reports/eda.md` |
+| **Flat-line** (owner decision 2026-10-15, N = 24 h on 2026-10-25): bikes unchanged ≥ 24 h while renting; a silence > 30 min ends the run | Flag (`flatline_flag`); kept, excluded from training targets in M3 |
 | Gaps | Forward-fill at most 2 buckets (30 min) in the 15-min table and mark `is_imputed`; never impute targets |
 
 ### 9.4 Resampling to 15-min grid

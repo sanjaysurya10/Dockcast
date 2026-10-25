@@ -201,14 +201,19 @@ def big_jumps_by_hour(
     )
 
 
-def flatline_runs(engine: Engine, source: str) -> pd.DataFrame:
-    """Length (hours) of runs of identical bike counts per station while renting."""
+def flatline_runs(engine: Engine, source: str, break_gap_min: int = 30) -> pd.DataFrame:
+    """Length (hours) of runs of identical bike counts per station while renting.
+
+    A silence longer than ``break_gap_min`` ends a run (same rule as the flat-line flag).
+    """
     return q(
         engine,
         """
         WITH r AS (
             SELECT station_key, observed_at,
-                   (bikes_available IS DISTINCT FROM lag(bikes_available) OVER w)::int AS changed
+                   (bikes_available IS DISTINCT FROM lag(bikes_available) OVER w
+                    OR observed_at - lag(observed_at) OVER w
+                       > make_interval(mins => :gap))::int AS changed
             FROM station_status_raw WHERE source = :source AND is_renting IS NOT FALSE
             WINDOW w AS (PARTITION BY station_key ORDER BY observed_at)
         ), g AS (
@@ -221,6 +226,7 @@ def flatline_runs(engine: Engine, source: str) -> pd.DataFrame:
         FROM g GROUP BY 1, 2
         """,
         source=source,
+        gap=break_gap_min,
     )
 
 
@@ -376,7 +382,13 @@ def _section_weather(engine: Engine, w: Window) -> list[str]:
 
 
 def _section_jumps(engine: Engine) -> list[str]:
-    out = ["## 6. Large count jumps (rebalancing candidates, PRD 9.3)", ""]
+    out = [
+        "## 6. Large count jumps (rebalancing candidates, PRD 9.3)",
+        "",
+        "Raw consecutive observations, before spike removal (the 03:15 local Format B spikes "
+        "are visible here; section 8 shows what the cleaning removed and flagged).",
+        "",
+    ]
     for source, max_gap in (("hist_b", 10.0), ("live", 5.0)):
         dist = jump_distribution(engine, source, max_gap)
         if dist.empty:
@@ -407,7 +419,8 @@ def _section_flatline(engine: Engine) -> list[str]:
     return [
         "## 7. Flat-lined counts (owner decision 2026-10-15: flag stations unchanged > N h)",
         "",
-        f"Format B: {len(runs)} runs of identical bike counts while renting; run length (h) "
+        f"Format B: {len(runs)} runs of identical bike counts while renting (a silence > 30 min "
+        f"ends a run); run length (h) "
         f"{q_text}. Runs {over}.",
         "",
         md_table(longest, "{:.1f}"),
