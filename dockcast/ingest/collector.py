@@ -26,6 +26,7 @@ from dockcast.db.queries import (
     StationRecord,
     ensure_city,
     insert_status_rows,
+    record_capacity,
     station_keys,
     upsert_stations,
 )
@@ -116,8 +117,11 @@ def sync_station_information(
     )
     records = [StationRecord(i.station_id, i.name, i.lat, i.lon, i.capacity) for i in infos]
     ensure_city(session, city)
-    upsert_stations(session, city.city_code, records, now)
-    log.info("station_info_synced", stations=len(infos))
+    keys = upsert_stations(session, city.city_code, records, now)
+    changed = sum(
+        record_capacity(session, keys[i.station_id], now, i.capacity, "live") for i in infos
+    )
+    log.info("station_info_synced", stations=len(infos), capacity_changes=changed)
     return feeds
 
 

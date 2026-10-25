@@ -24,3 +24,12 @@ stale_after_min = 15
 
 [retention]
 raw_live_days = 7                     # PRD 18.4 (owner decision 2026-10-15)
+
+[cleaning]                            # PRD 9.3; values from reports/eda.md, owner decisions 2026-10-25
+spike_min_delta = 8                   # obs differing by >= this from BOTH neighbours (V-shape) ...
+spike_max_gap_min = 10                # ... both neighbours within this many minutes -> excluded
+rebalance_min_delta = 8               # max-min of bikes within the window >= this -> rebalance_flag
+rebalance_window_min = 10
+flatline_min_hours = 24               # unchanged bikes for >= this while renting -> flatline_flag
+run_break_gap_min = 30                # a silence longer than this ends a flat-line run (data gap)
+capacity_tolerance = 2                # bikes + docks > capacity + this -> capacity_mismatch

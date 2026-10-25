@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down backfill backfill-new gaps weather resample calendar eda collect collector-up collector-down collector-logs health lint typecheck pytest test
+.PHONY: setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda collect collector-up collector-down collector-logs health lint typecheck pytest test
 
 -include .env
 export
@@ -30,6 +30,9 @@ weather:
 
 resample:
 	uv run python -m dockcast.transform.resample
+
+capacity:
+	uv run python -m dockcast.transform.capacity
 
 calendar:
 	uv run python -m dockcast.ingest.calendar

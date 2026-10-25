@@ -82,6 +82,18 @@ class RetentionConfig(BaseModel):
     raw_live_days: int = Field(ge=1)
 
 
+class CleaningConfig(BaseModel):
+    """Cleaning thresholds (PRD 9.3), tuned from ``reports/eda.md``."""
+
+    spike_min_delta: int = Field(ge=1)
+    spike_max_gap_min: int = Field(ge=1)
+    rebalance_min_delta: int = Field(ge=1)
+    rebalance_window_min: int = Field(ge=1)
+    flatline_min_hours: int = Field(ge=1)
+    run_break_gap_min: int = Field(ge=1)
+    capacity_tolerance: int = Field(ge=0)
+
+
 class ProjectConfig(BaseModel):
     """Contents of `config/settings.toml`."""
 
@@ -90,6 +102,7 @@ class ProjectConfig(BaseModel):
     spatial: SpatialConfig
     collector: CollectorConfig
     retention: RetentionConfig
+    cleaning: CleaningConfig
 
 
 class CityConfig(BaseModel):

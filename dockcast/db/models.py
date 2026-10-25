@@ -68,6 +68,18 @@ class Station(CreatedAtMixin, Base):
     cluster_id: Mapped[int | None] = mapped_column(Integer)
 
 
+class StationCapacity(CreatedAtMixin, Base):
+    """Capacity change points: ``capacity`` applies from ``valid_from`` until the next row."""
+
+    __tablename__ = "station_capacity"
+    __table_args__ = (CheckConstraint("capacity >= 0", name="station_capacity_non_negative"),)
+
+    station_key: Mapped[int] = mapped_column(ForeignKey("stations.station_key"), primary_key=True)
+    valid_from: Mapped[datetime] = mapped_column(TZ, primary_key=True)
+    capacity: Mapped[int] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(Text)
+
+
 class StationIdMap(CreatedAtMixin, Base):
     """Maps historical station IDs to station keys."""
 

@@ -415,6 +415,31 @@ def _section_flatline(engine: Engine) -> list[str]:
     ]
 
 
+def cleaning_summary(engine: Engine) -> pd.DataFrame:
+    """Per source period: raw rows, rows excluded as spikes, and flagged buckets (PRD 9.3)."""
+    return q(
+        engine,
+        """
+        WITH periods AS (
+            SELECT source, min(observed_at) AS lo, max(observed_at) AS hi, count(*) AS raw_rows
+            FROM station_status_raw GROUP BY 1
+        )
+        SELECT p.source, p.raw_rows,
+               p.raw_rows - sum(b.n_obs) AS spikes_excluded,
+               count(*) FILTER (WHERE b.n_obs > 0) AS observed_buckets,
+               count(*) FILTER (WHERE b.is_imputed) AS imputed,
+               count(*) FILTER (WHERE b.rebalance_flag) AS rebalance,
+               count(*) FILTER (WHERE b.flatline_flag) AS flatline,
+               count(*) FILTER (WHERE b.capacity_mismatch) AS capacity_mismatch,
+               count(*) FILTER (WHERE b.is_closed) AS closed
+        FROM periods p JOIN station_status_15m b
+          ON b.ts >= date_bin('15 minutes', p.lo, TIMESTAMPTZ '2000-01-01 00:00+00')
+         AND b.ts <= p.hi
+        GROUP BY p.source, p.raw_rows ORDER BY min(p.lo)
+        """,
+    )
+
+
 def build_report(engine: Engine) -> str:
     """Compute everything and render the markdown report (also writes the figures).
 
@@ -451,7 +476,14 @@ def build_report(engine: Engine) -> str:
         "",
         *_section_jumps(engine),
         *_section_flatline(engine),
-        "## 8. bikes + docks vs current capacity",
+        "## 8. Cleaning applied (PRD 9.3; thresholds in config/settings.toml [cleaning])",
+        "",
+        "Spikes are single V-shaped readings removed before bucketing; flags mark 15-min buckets "
+        "and are kept for error analysis. Capacity uses the capacity in force at the time.",
+        "",
+        md_table(cleaning_summary(engine)),
+        "",
+        "## 9. bikes + docks vs current capacity (before using capacity history)",
         "",
     ]
     for source in ("hist_b", "live"):

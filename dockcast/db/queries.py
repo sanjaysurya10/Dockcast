@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from dockcast.config import CityConfig
-from dockcast.db.models import City, Station, StationStatusRaw
+from dockcast.db.models import City, Station, StationCapacity, StationStatusRaw
 
 
 @dataclass(frozen=True)
@@ -127,3 +127,37 @@ def insert_status_rows(session: Session, rows: Sequence[dict[str, Any]]) -> int:
         .returning(StationStatusRaw.station_key)
     )
     return len(session.execute(stmt).all())
+
+
+def record_capacity(
+    session: Session, station_key: int, valid_from: datetime, capacity: int, source: str
+) -> bool:
+    """Insert a change point if it differs from the capacity in force at ``valid_from``.
+
+    Args:
+        session: Open session (caller commits).
+        station_key: Station.
+        valid_from: When the capacity was observed.
+        capacity: Observed capacity.
+        source: ``live`` / ``hist_a`` / ``hist_b``.
+
+    Returns:
+        True if a row was inserted.
+    """
+    current = session.scalar(
+        select(StationCapacity.capacity)
+        .where(StationCapacity.station_key == station_key, StationCapacity.valid_from <= valid_from)
+        .order_by(StationCapacity.valid_from.desc())
+        .limit(1)
+    )
+    if current == capacity:
+        return False
+    session.execute(
+        insert(StationCapacity)
+        .values(station_key=station_key, valid_from=valid_from, capacity=capacity, source=source)
+        .on_conflict_do_update(
+            index_elements=["station_key", "valid_from"],
+            set_={"capacity": capacity, "source": source},
+        )
+    )
+    return True

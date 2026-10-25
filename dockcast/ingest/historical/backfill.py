@@ -21,6 +21,7 @@ from dockcast.config import (
 )
 from dockcast.db.engine import make_engine
 from dockcast.db.models import DataQualityFile, Station, StationIdMap
+from dockcast.db.queries import record_capacity
 from dockcast.ingest.collector import sync_station_information
 from dockcast.ingest.historical.download import FORMAT_A_FILE, FORMAT_B_FILE, list_resources
 from dockcast.ingest.historical.formats import detect_format, read_header
@@ -35,6 +36,7 @@ from dockcast.quality.profile import (
     save_profiles,
     write_report,
 )
+from dockcast.transform.capacity_points import change_points, point_records
 
 log = structlog.get_logger(job="backfill")
 
@@ -230,6 +232,9 @@ def load_into_db(
             keys = map_station_keys(session, city.city_code, df, notes)
             session.commit()
             df = df.assign(station_key=df["source_id"].map(keys).astype("int64"))
+            for point in point_records(change_points(df)):
+                record_capacity(session, **point)
+            session.commit()
             inserted = copy_raw_rows(engine, df)
             log.info("loaded", file=path.name, rows=len(df), inserted=inserted)
         row = profile.db_row(now)
