@@ -11,8 +11,18 @@ services:
     volumes:
       - /var/lib/dockcast/data:/app/data
     restart: unless-stopped
-    logging:
+    logging: &logging
       driver: json-file
       options:
         max-size: "10m"
         max-file: "5"
+
+  # Met Éireann point forecast for the city centre, hourly at :20 (PRD 9.5; owner decision
+  # 2026-10-25 to start collecting during M2). Same image as the collector.
+  weather-forecast:
+    build:
+      context: ../..
+    command: ["python", "-m", "dockcast.ingest.weather_forecast", "--loop"]
+    env_file: .env
+    restart: unless-stopped
+    logging: *logging

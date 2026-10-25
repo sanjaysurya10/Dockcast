@@ -7,6 +7,7 @@ license = "MIT"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.13",
+    "holidays>=0.106",
     "httpx>=0.28.1",
     "pandas>=2.2,<3",
     "psycopg[binary]>=3.2",
@@ -29,6 +30,12 @@ dev = [
     "ruff>=0.5",
     "testcontainers[postgres]>=4.7",
 ]
+report = [
+    "matplotlib>=3.9",
+]
+
+[tool.uv]
+default-groups = ["dev", "report"]
 
 [build-system]
 requires = ["hatchling"]

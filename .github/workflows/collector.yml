@@ -31,5 +31,5 @@ jobs:
       - name: Poll if primary is stale
         if: ${{ env.DATABASE_URL != '' }}
         run: |
-          uv sync --locked --no-dev
-          uv run --no-dev python -m dockcast.ingest.collector --once --if-stale-min 3
+          uv sync --locked --no-default-groups
+          uv run --no-sync python -m dockcast.ingest.collector --once --if-stale-min 3

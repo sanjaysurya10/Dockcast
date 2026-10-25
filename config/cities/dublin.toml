@@ -10,3 +10,8 @@ default_zoom = 13.0
 gbfs_root_url = "https://api.cyclocity.fr/contracts/dublin/gbfs/gbfs.json"
 # CKAN package holding the historical monthly CSVs (PRD 5.1 D2).
 ckan_package_url = "https://data.gov.ie/api/3/action/package_show?id=dublinbikes-api"
+# Met Éireann hourly observations, Dublin Airport (station 532), CC BY 4.0 (PRD 5.1 D4).
+# Owner decision 2026-10-25: Dublin Airport (only nearby station with wind and cloud).
+weather_station = "Dublin Airport (532)"
+weather_history_url = "https://clidata.met.ie/cli/climate_data/webdata/hly532.csv"
+weather_history_start = "2021-09-30"

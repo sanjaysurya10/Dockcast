@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down backfill backfill-new gaps collect collector-up collector-down collector-logs health lint typecheck pytest test
+.PHONY: setup db-up db-down backfill backfill-new gaps weather collect collector-up collector-down collector-logs health lint typecheck pytest test
 
 -include .env
 export
@@ -23,6 +23,10 @@ backfill-new:
 
 gaps:
 	uv run python -m dockcast.quality.gaps
+
+weather:
+	uv run python -m dockcast.ingest.weather_history
+	uv run python -m dockcast.ingest.weather_forecast
 
 collect:
 	uv run python -m dockcast.ingest.collector

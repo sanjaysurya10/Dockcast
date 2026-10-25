@@ -19,7 +19,8 @@ class EnvSettings(BaseSettings):
     database_url: str = "postgresql+psycopg://dockcast:dockcast@localhost:5432/dockcast"
     city: str = "dublin"
     gbfs_root_url: str = ""
-    met_forecast_url: str = "http://metwdb-openaccess.ichec.ie/metno-wdb2ts/locationforecast"
+    # Host moved from metwdb-openaccess.ichec.ie (no longer resolves; checked 2026-10-25).
+    met_forecast_url: str = "http://openaccess.pf.api.met.ie/metno-wdb2ts/locationforecast"
     mlflow_tracking_uri: str = "file:./mlruns"
     archive_bucket_url: str = ""
     api_cors_origins: str = "http://localhost:5173"
@@ -102,6 +103,9 @@ class CityConfig(BaseModel):
     default_zoom: float
     gbfs_root_url: str = ""
     ckan_package_url: str = ""
+    weather_station: str = ""
+    weather_history_url: str = ""
+    weather_history_start: str = "2021-09-30"
 
 
 def _read_toml(path: Path) -> dict[str, object]:

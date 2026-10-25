@@ -1,0 +1,50 @@
+Station Name: DUBLIN AIRPORT
+Station Height: 71 M 
+Latitude:53.428  ,Longitude: -6.241
+
+
+date:  -  Date and Time (utc)
+ind:   -  irainfall   Rainfall indicator
+rain:  -  Precipitation Amount (mm)  
+ind:   -  ittt Dry bulb indicator
+temp:  -  Air Temperature (C)
+ind:   -  iwb Wet bulb indicator
+wetb:  -  Wet Bulb Temperature (C)
+dewpt: -  Dew Point Temperature (C)             
+rhum:  -  Relative Humidity (%)
+vappr: -  Vapour Pressure (hPa) 
+msl:   -  Mean Sea Level Pressure (hPa)
+ind:   -  itabspeed wind Speed indicator
+wdsp:  -  Mean Wind Speed (knot)
+ind:   -  itabdir  wind dir indicator
+wddir: -  Predominant Wind Direction (degree)
+ww:    -  Synop code for Present Weather
+w:     -  Synop code for Past Weather
+sun:   -  Sunshine duration (hours)
+vis:   -  Visibility (m)
+clht:  -  Cloud height (100's of ft) - 999 if none 
+clamt: -  Cloud amount
+
+
+Code  irainfall                    ittt              iwb                    itabspeed / itabdir
+----  -------------------------    --------------    ---------------------  -------------------------
+0     satisfactory                 positive          positive               -
+1     deposition                   negative          negative               10 min
+2     trace / sum of traces        est. positive     est. positive          60 min
+3     trace / sum of traces (dep.) est. negative     est. negative          10 min + defective
+4     estimated precipitation      not available     not available          60 min + defective
+5     estimated deposition         -                 frozen negative        10 min + partially defective
+6     estimated precip. trace      -                 frozen positive        60 min + partially defective
+7     estimated deposition trace   -                 est. frozen negative   not available
+8     not available                -                 est. frozen positive   -
+111   investigation required       investigation required                   investigation required
+
+date,ind,rain,ind,temp,ind,wetb,dewpt,vappr,rhum,msl,ind,wdsp,ind,wddir,ww,w,sun,vis,clht,clamt
+25-oct-2025 00:00,111,0.0,111,8.3,111,7.2,5.9,9.3,85,1004.7,111,14,111,310,2,82,0.0,25000,140,6
+25-oct-2025 01:00,111,0.0,111,7.9,111,6.9,5.6,9.1,86,1005.2,111,12,111,300,2,11,0.0,25000,150,6
+25-oct-2025 02:00,111,0.0,111,7.7,111,6.5,5.1,8.7,83,1005.7,111,15,111,310,2,11,0.0,25000,230,6
+25-oct-2025 03:00,111,0.0,111,7.3,111,6.2,4.8,8.6,84,1006.6,111,17,111,310,2,11,0.0,25000,230,6
+26-oct-2025 00:00,111,0.0,111,4.6,111,3.9,2.9,7.5,89,1013.7,111,13,111,290,2,51,0.0,20000,999,2
+26-oct-2025 01:00,111,0.0,111,3.9,111,3.3,2.5,7.3,90,1014.2,111,12,111,280,2,11,0.0,20000,999,2
+26-oct-2025 02:00,111,0.0,111,3.9,111,3.1,1.9,7.0,87,1013.9,111,11,111,280,2,11,0.0,20000,999,1
+26-oct-2025 03:00,111,0.0,111,3.7,111,3.0,2.0,7.0,88,1013.9,111,9,111,280,2,11,0.0,20000,999,1
