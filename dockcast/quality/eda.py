@@ -87,18 +87,31 @@ def coverage(engine: Engine) -> pd.DataFrame:
 
 
 def hourly_profile(engine: Engine, w: Window) -> pd.DataFrame:
-    """Occupancy, empty and full shares by local hour, weekday vs weekend."""
+    """Occupancy, empty and full shares by local hour, weekday vs weekend.
+
+    Occupancy uses the capacity in force at the time (``station_capacity``). Closed and
+    flat-lined buckets are excluded (a dead station stuck at 0 would inflate "empty").
+    """
     return q(
         engine,
         f"""
+        WITH cap AS (
+            SELECT station_key, valid_from, capacity,
+                   lead(valid_from, 1, 'infinity') OVER (PARTITION BY station_key
+                                                         ORDER BY valid_from) AS valid_to
+            FROM station_capacity
+        )
         SELECT {LOCAL_HOUR.format(col="b.ts")} AS hour,
                ({LOCAL_DOW.format(col="b.ts")} >= 6) AS weekend,
-               avg(b.bikes_last / NULLIF(s.capacity, 0)) AS occupancy,
+               avg(b.bikes_last / NULLIF(c.capacity, 0)) AS occupancy,
                avg((b.bikes_last = 0)::int) AS empty_share,
                avg((b.docks_last = 0)::int) AS full_share,
                count(*) AS buckets
-        FROM station_status_15m b JOIN stations s USING (station_key)
-        WHERE b.n_obs > 0 AND NOT b.is_closed AND b.ts >= :start AND b.ts <= :end
+        FROM station_status_15m b
+        JOIN cap c ON c.station_key = b.station_key
+                  AND b.ts >= c.valid_from AND b.ts < c.valid_to
+        WHERE b.n_obs > 0 AND NOT b.is_closed AND NOT b.flatline_flag
+          AND b.ts >= :start AND b.ts <= :end
         GROUP BY 1, 2 ORDER BY 2, 1
         """,
         start=w.start,
@@ -112,7 +125,8 @@ WITH d AS (
            abs(b.bikes_last - lag(b.bikes_last) OVER w) AS dbikes,
            b.ts - lag(b.ts) OVER w AS step
     FROM station_status_15m b
-    WHERE b.n_obs > 0 AND NOT b.is_closed AND b.ts >= :start AND b.ts <= :end
+    WHERE b.n_obs > 0 AND NOT b.is_closed AND NOT b.flatline_flag AND NOT b.rebalance_flag
+      AND b.ts >= :start AND b.ts <= :end
     WINDOW w AS (PARTITION BY b.station_key ORDER BY b.ts)
 )
 """
@@ -297,16 +311,23 @@ def _save(fig: Figure, name: str) -> str:
 
 
 def _git_commit() -> str:
+    """Short HEAD hash, suffixed ``-dirty`` when tracked files have uncommitted changes."""
     try:
-        out = subprocess.run(
+        head = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
             text=True,
             cwd=PROJECT_ROOT,
-        )
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            cwd=PROJECT_ROOT,
+        ).stdout.strip()
     except OSError:
         return "unknown"
-    return out.stdout.strip() or "unknown"
+    return f"{head}-dirty" if head and dirty else head or "unknown"
 
 
 def _section_profile(engine: Engine, w: Window) -> list[str]:
@@ -324,7 +345,8 @@ def _section_profile(engine: Engine, w: Window) -> list[str]:
     e = prof.loc[prof.empty_share.idxmax()]
     f = prof.loc[prof.full_share.idxmax()]
     return [
-        "## 2. Occupancy, empty and full by hour",
+        "## 2. Occupancy, empty and full by hour (capacity at the time; closed and flat-lined "
+        "buckets excluded)",
         "",
         _save(fig, "eda_hourly_profile.png"),
         "",
@@ -342,9 +364,18 @@ def _section_turnover(engine: Engine, w: Window) -> list[str]:
     ax.set_yticks(range(7), ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
     ax.set_xticks(range(0, 24, 2), [str(h) for h in range(0, 24, 2)])
     ax.set_xlabel("local hour")
-    ax.set_title("mean |Δbikes| per station per 15 min (activity proxy, not trips)")
+    ax.set_title("mean |Δbikes| per station per 15 min, rebalancing excluded (not trips)")
     fig.colorbar(image, ax=ax)
-    return ["## 3. Activity by hour and weekday", "", _save(fig, "eda_turnover_heatmap.png"), ""]
+    return [
+        "## 3. Activity by hour and weekday",
+        "",
+        "Mean |Δbikes| between consecutive observed 15-min buckets; buckets flagged as "
+        "rebalancing, flat-lined or closed are excluded, so this approximates rider demand. It "
+        "is net change per station, not trips (PRD NG1).",
+        "",
+        _save(fig, "eda_turnover_heatmap.png"),
+        "",
+    ]
 
 
 def _section_weather(engine: Engine, w: Window) -> list[str]:
@@ -476,6 +507,9 @@ def build_report(engine: Engine) -> str:
         "## 1. Coverage",
         "",
         md_table(coverage(engine)),
+        "",
+        "Rows in the local research database. Live rows after the local collector stopped "
+        "(2026-10-22) are in the hosted database and reach this one via the R2 archive.",
         "",
         f"Data gaps (`reports/data_gaps.md`): {int(gaps.n[0])} gaps, "
         f"{float(gaps.days[0] or 0):.1f} days in total.",
