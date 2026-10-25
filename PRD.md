@@ -1086,6 +1086,7 @@ Resolve during M1 (unless noted); write the answer and source link next to each 
   6. Public repo `https://github.com/sanjaysurya10/Dockcast`; CI must be green.
   7. Cloud collector (always-on worker + hosted Postgres, GitHub Actions 5-min fallback) is set up right after `m1`, before M2; the owner creates all accounts.
 - **Owner decision 2026-10-22 — PostgreSQL 17 everywhere (6.3).** The Supabase project (`eu-west-1`) runs 17.11. Evidence: all integration tests (migrations up/down, collector, backfill, monthly backfill, archive/prune, uptime) pass on `postgres:17`. Local DB migrated by `pg_dump` (16) → `pg_restore` (17); all table row counts identical (19,985,353 raw rows). Old 16 volume `dockcast_pgdata` kept until the owner deletes it.
+- **M1 accepted 2026-10-25:** cloud collector 1440/1440 polls in the first 24 h window (2026-10-22 22:27 → 2026-10-23 22:27 UTC), 0 errors.
 - **Finding 2026-10-22:** the 24 h `m1` run on the PC failed twice because Windows slept (Kernel-Power event 42 at 2026-10-20 20:48 UTC; resumed 2026-10-22 14:14 UTC). The `m1` uptime check moves to the cloud VM.
 - [ ] MapLibre GL JS minimum version with globe projection (M13).
 - [ ] Basemap tile provider terms and attribution (M13).

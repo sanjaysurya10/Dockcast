@@ -5,5 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# ubuntu is in the docker group and owns the rclone config (~/.config/rclone/rclone.conf)
+User=ubuntu
 Environment=REPO_DIR=/opt/dockcast
 ExecStart=/opt/dockcast/deploy/oracle/archive.sh

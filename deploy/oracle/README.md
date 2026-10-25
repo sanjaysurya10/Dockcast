@@ -42,7 +42,9 @@ Parquet archive to Cloudflare R2, and a GitHub Actions fallback every 5 min.
 3. SSH in (`ssh ubuntu@<public-ip>`) and run:
 
 ```bash
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git rclone
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+# rclone: Ubuntu's package (v1.60) gets 501 NotImplemented from R2 on first upload; use the
+# official build (checksum-verified), e.g. v1.75.2 for arm64 from https://downloads.rclone.org/
 sudo usermod -aG docker "$USER" && exit          # log in again afterwards
 sudo git clone https://github.com/sanjaysurya10/Dockcast.git /opt/dockcast
 sudo chown -R "$USER" /opt/dockcast
@@ -70,7 +72,7 @@ The container restarts on failure and after a VM reboot (Docker starts on boot).
 ```bash
 rclone config    # n → name: r2 → Storage: s3 → provider: Cloudflare → access key / secret
                  # from step 2.2 → endpoint: https://<account-id>.r2.cloudflarestorage.com
-rclone lsd r2:   # expect: dockcast-archive
+rclone lsf r2:dockcast-archive   # bucket-scoped token: list objects, not buckets
 sudo cp deploy/oracle/dockcast-archive.{service,timer} /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now dockcast-archive.timer
 systemctl list-timers dockcast-archive.timer

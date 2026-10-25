@@ -1,6 +1,12 @@
 # Changelog
 
-## M1 — Data foundation (in progress, 2026-10-15)
+## M1 — Data foundation (2026-10-15 → 2026-10-25, tag `m1`)
+
+Acceptance: cloud collector (Oracle VM → Supabase) stored **1440/1440** scheduled polls in the
+first full 24 h window (2026-10-22 22:27 → 2026-10-23 22:27 UTC), 0 error runs; 4205/4205 from
+start to 2026-10-25 20:31 UTC (query on `collector_runs`, PRD S5 definition).
+`reports/data_profile.md` lists all 55 in-scope files; PRD §23 M1 items resolved.
+
 
 - Live GBFS discovered (JCDecaux, GBFS 2.3) and wired into `config/cities/dublin.toml`.
 - Schema per PRD §8 (migration `0002`); `weather_hourly` uses a surrogate key plus a
@@ -38,6 +44,10 @@
   dump/restore with identical row counts.
 - Supabase project `oyfrejzjkhjaohtknbvh` (eu-west-1, Postgres 17.11): schema applied from
   `alembic upgrade head --sql` (revision `0004`), Data API off, RLS on all 15 tables.
+- Cloud collector deployed (2026-10-22): Oracle Cloud A1 VM (UK South) running the collector
+  container → Supabase; nightly R2 archive timer (02:17 UTC); GitHub fallback verified with the
+  `DATABASE_URL` secret (run 39870075582: polled only if the VM is stale; it skipped). rclone on
+  the VM is the official v1.75.2 build (Ubuntu's v1.60 hit `501 NotImplemented` on R2).
 - CI: removed the placeholder web job (job-level `hashFiles()` made the workflow invalid);
   it returns in M13.
 

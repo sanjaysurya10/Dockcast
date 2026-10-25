@@ -9,6 +9,12 @@ BUCKET="${R2_BUCKET:-dockcast-archive}"
 COMPOSE=(docker compose -f "$REPO_DIR/deploy/oracle/docker-compose.worker.yml"
          --env-file "$REPO_DIR/deploy/oracle/.env")
 
-"${COMPOSE[@]}" run --rm collector python -m dockcast.ingest.archive export
-rclone copy --checksum /var/lib/dockcast/data/archive "r2:$BUCKET"
-"${COMPOSE[@]}" run --rm collector python -m dockcast.ingest.archive prune --confirm
+ARCHIVE_DIR=/var/lib/dockcast/data/archive
+
+"${COMPOSE[@]}" run --rm -T collector python -m dockcast.ingest.archive export
+if [ ! -d "$ARCHIVE_DIR" ]; then
+  echo "nothing older than the retention window yet; no upload, no prune"
+  exit 0
+fi
+rclone copy --checksum --s3-no-check-bucket "$ARCHIVE_DIR" "r2:$BUCKET"
+"${COMPOSE[@]}" run --rm -T collector python -m dockcast.ingest.archive prune --confirm
