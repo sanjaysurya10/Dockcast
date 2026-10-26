@@ -15,6 +15,7 @@
 - E1 baselines, MLflow run `2692ee7f49494167ba225ccc3c9c5303` (git `0c5b9de`): persistence MAE
   +30/+60/+120 = 1.066 / 1.721 / 2.768 bikes; seasonal naive 7 d = 6.355 / 6.354 / 6.354.
   Fold 8 +60 persistence MAE re-derived independently in SQL (1.8197 vs 1.8198).
+- S1 reset by owner: +60 MAE ≤ 1.463 bikes (≥ 15 % below persistence 1.721).
 - MLflow 3.17 (`ml` group); file store kept per PRD 6.3 via `MLFLOW_ALLOW_FILE_STORE=true`
   (`dockcast/tracking.py`).
 

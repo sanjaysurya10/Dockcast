@@ -77,7 +77,7 @@ It is a data-science-first project: a rigorous, leakage-free forecasting study w
 
 | ID | Criterion | Target | Measured by |
 |---|---|---|---|
-| S1 | MAE at +60 min vs persistence | ≥ 15% lower **(starting goal; reset after baselines are measured in M3)** | Backtest report |
+| S1 | MAE at +60 min vs persistence | ≥ 15% lower: **MAE ≤ 1.463 bikes** (MASE ≤ 0.85) vs persistence 1.721, mean of the 8 E1 folds (MLflow run `2692ee7f49494167ba225ccc3c9c5303`; reset by owner 2026-10-26) | Backtest report |
 | S2 | 80% interval coverage (P10–P90) at +60 min | 75–85% | Backtest report |
 | S3 | Empty-event classifier PR-AUC at +60 min | Beats a "current bikes ≤ k" rule baseline | Backtest report |
 | S4 | Leakage tests | 100% pass | `pytest -m leakage` |
@@ -1094,6 +1094,7 @@ Resolve during M1 (unless noted); write the answer and source link next to each 
   - D4 station: **Dublin Airport (532)** (owner decision). Phoenix Park (175) has no wind/cloud columns. 2021-10-01 → 2026-10-01: 43,825/43,825 hours, 0 % missing. ~93 % of these rows carry indicator 111 ("investigation required", not yet QC'd); values are kept and the share is reported in `reports/eda.md`.
   - D6 terms (owner decision): `is_school_term` = post-primary terms from circulars 0005/2020, 0072/2022, 0018/2026 (breaks verbatim; year start "week in which 1st September falls", end "Friday preceding the June bank holiday"); `is_uni_term` = TCD semesters 2021/22–2026/27 (official calendar PDFs). UCD (automated access returns 403), DCU and TU Dublin (only current year online) deferred; unsourced days are NULL, never guessed. `calendar_days` term flags made nullable (migration 0005).
   - Local disk: C: at 99 % (6.9 GB free) on 2026-10-25; old Postgres 16 volume deleted (owner approval); full resample runs per station to bound temp space.
+- **S1 reset (owner, 2026-10-26):** persistence +60 MAE measured at 1.721 bikes (E1 run `2692ee7f49494167ba225ccc3c9c5303`, 8 folds 2026-05-05 → 2026-06-30); S1 = ≥ 15 % lower, i.e. MAE ≤ 1.463 (MASE ≤ 0.85) on the same folds and common rows.
 - **M3 decisions (2026-10-26):** MLflow added (`ml` uv group, `mlflow` 3.17.2, local `file:./mlruns`, not in the VM image); `pyarrow` pin relaxed to `>=17,<26` for MLflow. Evaluation targets exclude closed, imputed and flat-lined buckets. All models in an experiment are scored on **common rows** (every model has a prediction); excluded counts are reported, and MASE uses persistence MAE on the same rows.
 - **M1 accepted 2026-10-25:** cloud collector 1440/1440 polls in the first 24 h window (2026-10-22 22:27 → 2026-10-23 22:27 UTC), 0 errors.
 - **Finding 2026-10-22:** the 24 h `m1` run on the PC failed twice because Windows slept (Kernel-Power event 42 at 2026-10-20 20:48 UTC; resumed 2026-10-22 14:14 UTC). The `m1` uptime check moves to the cloud VM.
