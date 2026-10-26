@@ -1,5 +1,29 @@
 # Changelog
 
+## M4 — LightGBM + ridge (2026-10-26)
+
+- Features PRD 10.2-10.4 (`dockcast/features/matrix.py`, groups in `features/registry.py`): lags
+  (bikes and ratio, 1/2/3/4/8 buckets), seasonal (T-1 d, T-7 d), rolling mean/std (1 h, 3 h),
+  change/acceleration, zero bikes/docks in 24 h, calendar of the target time (local), capacity at
+  the time, lat/lon, in-fold station x hour occupancy encoding. Leakage tests for every feature.
+- Models: `ridge` (imputed, standardised, one-hot hour/dow) and `lgbm_global` (quantiles
+  0.1/0.5/0.9, station categorical, PRD 12.3 defaults, early stopping on the last training week);
+  post-processing clips to [0, capacity] and sorts quantiles. Champion selection (PRD 12.5).
+- E1 full, MLflow run `fb0d738826974ae9982cc4e96b96e5ba` (8 folds, ~600 k common rows per
+  horizon, **no weather**): lgbm_global MAE +30/+60/+120 = 0.995 / 1.461 / 2.047 (MASE 0.933 /
+  0.849 / 0.740), coverage P10-P90 = 0.825 / 0.814 / 0.797; persistence 1.066 / 1.721 / 2.768;
+  ridge 1.179 / 1.869 / 2.874 (worse than persistence at every horizon). Champion: lgbm_global at
+  all horizons. **S1 met by 0.002 bikes** (1.461 vs 1.463; fold std 0.061) — borderline.
+- Error analysis v1 (`reports/error_analysis.md`, `make error-analysis`): worst stations are
+  Docklands/canal commuter stations; errors peak 07-09 and 16-18; LightGBM slightly over-follows
+  sharp changes while persistence lags them; rebalancing-flagged targets are 0.7 % of rows but
+  9.5 % of LightGBM errors > 5 bikes; at +30 on weekends LightGBM (0.750) is slightly worse than
+  persistence (0.732).
+- 51 of 72 LightGBM boosters hit the 2000-round cap (not converged at PRD 12.3 defaults) — for
+  v2 tuning (Optuna, PRD 12.3).
+- Fixes: fold boundaries on the 15-min grid; DB timestamps normalised to UTC; E1 records the
+  commit at run start. Dependencies: `lightgbm`, `scikit-learn` (`ml` group).
+
 ## M3 — Baselines + backtest framework (2026-10-26)
 
 - Targets (`dockcast/targets/regression.py`): state at t + h = last observation of the bucket
