@@ -2,7 +2,7 @@
 
 ## E1 — Baselines (persistence, seasonal naive 7 d)
 
-MLflow run `2003957e8dee41c0a8fac700fc2f21e4` · git `e64b761-dirty` · generated 2026-10-26 00:33 UTC · data 2026-04-28 23:45 → 2026-06-30 23:45 UTC
+MLflow run `2692ee7f49494167ba225ccc3c9c5303` · git `0c5b9de` · generated 2026-10-26 00:34 UTC · data 2026-04-28 23:45 → 2026-06-30 23:45 UTC
 
 Rolling origin, 8 test weeks, Format B (PRD 9.1a, 13.1); fold dates in `reports/folds.json`. Targets: state at t + h (bucket ending at t + h); closed, imputed and flat-lined targets excluded; all models scored on common rows. MAE/RMSE in bikes; values are means over folds (± std of fold MAE). No weather is used by these models.
 
@@ -38,3 +38,4 @@ Persistence MAE by slice at +60 (mean over folds):
 | 6 | 2026-06-09 23:45 | 2026-06-16 23:45 |
 | 7 | 2026-06-16 23:45 | 2026-06-23 23:45 |
 | 8 | 2026-06-23 23:45 | 2026-06-30 23:45 |
+

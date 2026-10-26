@@ -1,5 +1,23 @@
 # Changelog
 
+## M3 — Baselines + backtest framework (2026-10-26)
+
+- Targets (`dockcast/targets/regression.py`): state at t + h = last observation of the bucket
+  ending at t + h; closed, imputed and flat-lined targets excluded (owner decision).
+- Baselines behind the `Forecaster` protocol: `persistence`, `seasonal_naive_7d`; inputs built
+  with a cut-off and gap masking (`dockcast/features/build.py`).
+- Metrics: MAE, RMSE, MASE, bias, pinball, coverage, interval width (hand-checked tests).
+- Backtest runner: 8 gap-free weekly folds (boundaries snapped to the 15-min grid; fold dates
+  in `reports/folds.json`), common-row scoring, slices (hour, weekday, rush hour, capacity band,
+  rebalance, station) → `backtest_results`, MLflow, `reports/experiments.md`. `make backtest E=E1`.
+- Leakage suite (`pytest -m leakage`, 89 tests): features unchanged when data after t is deleted,
+  poisoned future values never reach features, target never a feature, fold gap ≥ max horizon.
+- E1 baselines, MLflow run `2692ee7f49494167ba225ccc3c9c5303` (git `0c5b9de`): persistence MAE
+  +30/+60/+120 = 1.066 / 1.721 / 2.768 bikes; seasonal naive 7 d = 6.355 / 6.354 / 6.354.
+  Fold 8 +60 persistence MAE re-derived independently in SQL (1.8197 vs 1.8198).
+- MLflow 3.17 (`ml` group); file store kept per PRD 6.3 via `MLFLOW_ALLOW_FILE_STORE=true`
+  (`dockcast/tracking.py`).
+
 ## M2 — Clean + resample + EDA (2026-10-25)
 
 - Resampler (`make resample`, `dockcast/transform/resample.py`): raw → `station_status_15m` in
