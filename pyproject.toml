@@ -11,7 +11,7 @@ dependencies = [
     "httpx>=0.28.1",
     "pandas>=2.2,<3",
     "psycopg[binary]>=3.2",
-    "pyarrow>=26.0.0",
+    "pyarrow>=17,<26",
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "sqlalchemy>=2.0",
@@ -30,12 +30,15 @@ dev = [
     "ruff>=0.5",
     "testcontainers[postgres]>=4.7",
 ]
+ml = [
+    "mlflow>=2.17",
+]
 report = [
     "matplotlib>=3.9",
 ]
 
 [tool.uv]
-default-groups = ["dev", "report"]
+default-groups = ["dev", "report", "ml"]
 
 [build-system]
 requires = ["hatchling"]

@@ -647,7 +647,7 @@ Gap rule (9.8): a lag or rolling value is NaN if any bucket it reads lies inside
 
 ### 11.1 Regression target
 
-`y_h = bikes_last(t + h)` for `h ∈ {30, 60, 120}` min (2, 4, 8 buckets). Docks are derived: `docks = capacity - bikes`, clipped to `[0, capacity]`. Rows where the target bucket is closed or imputed are excluded.
+`y_h = bikes_last(t + h)` for `h ∈ {30, 60, 120}` min (2, 4, 8 buckets), where `bikes_last(T)` is the last observation of the 15-min bucket that **ends** at `T` (state at `T`). Docks are derived: `docks = capacity - bikes`, clipped to `[0, capacity]`. Rows where the target bucket is closed, imputed **or flat-lined** (owner decision 2026-10-26) are excluded; rebalance-flagged targets stay in and form their own slice.
 
 ### 11.2 Event labels (v2)
 
@@ -1094,6 +1094,7 @@ Resolve during M1 (unless noted); write the answer and source link next to each 
   - D4 station: **Dublin Airport (532)** (owner decision). Phoenix Park (175) has no wind/cloud columns. 2021-10-01 → 2026-10-01: 43,825/43,825 hours, 0 % missing. ~93 % of these rows carry indicator 111 ("investigation required", not yet QC'd); values are kept and the share is reported in `reports/eda.md`.
   - D6 terms (owner decision): `is_school_term` = post-primary terms from circulars 0005/2020, 0072/2022, 0018/2026 (breaks verbatim; year start "week in which 1st September falls", end "Friday preceding the June bank holiday"); `is_uni_term` = TCD semesters 2021/22–2026/27 (official calendar PDFs). UCD (automated access returns 403), DCU and TU Dublin (only current year online) deferred; unsourced days are NULL, never guessed. `calendar_days` term flags made nullable (migration 0005).
   - Local disk: C: at 99 % (6.9 GB free) on 2026-10-25; old Postgres 16 volume deleted (owner approval); full resample runs per station to bound temp space.
+- **M3 decisions (2026-10-26):** MLflow added (`ml` uv group, `mlflow` 3.17.2, local `file:./mlruns`, not in the VM image); `pyarrow` pin relaxed to `>=17,<26` for MLflow. Evaluation targets exclude closed, imputed and flat-lined buckets. All models in an experiment are scored on **common rows** (every model has a prediction); excluded counts are reported, and MASE uses persistence MAE on the same rows.
 - **M1 accepted 2026-10-25:** cloud collector 1440/1440 polls in the first 24 h window (2026-10-22 22:27 → 2026-10-23 22:27 UTC), 0 errors.
 - **Finding 2026-10-22:** the 24 h `m1` run on the PC failed twice because Windows slept (Kernel-Power event 42 at 2026-10-20 20:48 UTC; resumed 2026-10-22 14:14 UTC). The `m1` uptime check moves to the cloud VM.
 - [ ] MapLibre GL JS minimum version with globe projection (M13).
