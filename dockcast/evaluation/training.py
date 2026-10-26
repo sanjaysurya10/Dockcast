@@ -78,7 +78,7 @@ def prepare_fold(
     valid_start = fold.train_end - VALID_WINDOW
     grid = build_grid(panel, gaps, pd.Timestamp(fold.test_end))
     encoding = fit_station_hour_encoding(panel, pd.Timestamp(fold.train_end))
-    first = pd.Timestamp(data_start).ceil("h") + LOOKBACK
+    first = pd.Timestamp(data_start).tz_convert("UTC").ceil("h") + LOOKBACK
     spans = {
         "train": hourly_issue_times(first, valid_start - step, horizon_min),
         "valid": issue_times(valid_start, fold.train_end - step, horizon_min),

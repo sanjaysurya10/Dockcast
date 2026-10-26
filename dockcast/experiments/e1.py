@@ -9,7 +9,7 @@ import argparse
 import json
 import time
 from collections.abc import Callable, Sequence
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import mlflow
 import pandas as pd
@@ -50,7 +50,7 @@ KEEP_COLUMNS = [
 
 
 def b_span(engine: Engine) -> tuple[datetime, datetime]:
-    """First and last Format B observation."""
+    """First and last Format B observation, as ``datetime.UTC`` (psycopg returns Etc/UTC)."""
     with engine.connect() as conn:
         lo, hi = conn.execute(
             text(
@@ -58,7 +58,7 @@ def b_span(engine: Engine) -> tuple[datetime, datetime]:
                 "WHERE source = 'hist_b'"
             )
         ).one()
-    return lo, hi
+    return lo.astimezone(UTC), hi.astimezone(UTC)
 
 
 def default_folds(engine: Engine, gaps: Sequence[Gap]) -> list[Fold]:
@@ -107,8 +107,9 @@ def run(
     calendar, info = reference_tables(engine)
     outcomes: list[FoldOutcome] = []
     iterations: dict[str, int] = {}
+    full_panel = load_panel(engine, data_start, max(f.test_end for f in folds))
     for fold in folds:
-        panel = load_panel(engine, data_start, fold.test_end)
+        panel = full_panel[full_panel["state_ts"] <= pd.Timestamp(fold.test_end)]
         stations = sorted(int(s) for s in panel["station_key"].unique())
         for horizon in horizons:
             started = time.monotonic()
