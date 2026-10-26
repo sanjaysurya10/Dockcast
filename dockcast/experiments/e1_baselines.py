@@ -14,7 +14,7 @@ import structlog
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
-from dockcast.config import PROJECT_ROOT, get_env_settings, load_project_config
+from dockcast.config import PROJECT_ROOT, load_project_config
 from dockcast.db.engine import make_engine
 from dockcast.evaluation.backtest import FoldOutcome, run_fold, summarise
 from dockcast.evaluation.reports import (
@@ -32,6 +32,7 @@ from dockcast.models.base import Forecaster
 from dockcast.models.baselines import Persistence, SeasonalNaive7d
 from dockcast.quality.gaps import Gap, load_gaps
 from dockcast.targets.regression import load_panel
+from dockcast.tracking import setup_mlflow
 
 log = structlog.get_logger(job="e1")
 EXPERIMENT = "E1"
@@ -157,15 +158,13 @@ def render_section(
 
 def main() -> None:
     """``make backtest E=E1``."""
-    settings = get_env_settings()
     engine = make_engine()
     with Session(engine) as session:
         gaps = load_gaps(session)
     folds = default_folds(engine, gaps)
     horizons = load_project_config().forecast.horizons_min
     models: list[Forecaster] = [Persistence(), SeasonalNaive7d()]
-    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    mlflow.set_experiment(EXPERIMENT)
+    setup_mlflow(EXPERIMENT)
     with mlflow.start_run(run_name="e1_baselines") as active:
         run_id = active.info.run_id
         outcomes, results = run(engine, folds, gaps, horizons, models)

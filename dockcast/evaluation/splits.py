@@ -36,6 +36,20 @@ def last_complete_month_end(last_observation: datetime, tolerance: timedelta) ->
     return end.to_pydatetime()
 
 
+def floor_to_grid(ts: datetime, step: timedelta = timedelta(minutes=15)) -> datetime:
+    """Floor an aware datetime to the UTC bucket grid.
+
+    Args:
+        ts: Timestamp.
+        step: Grid step.
+
+    Returns:
+        The latest grid point at or before ``ts`` (UTC).
+    """
+    floored = pd.Timestamp(ts).tz_convert("UTC").floor(f"{int(step.total_seconds())}s")
+    return floored.to_pydatetime()
+
+
 def rolling_origin_folds(
     data_start: datetime,
     end: datetime,
@@ -46,7 +60,9 @@ def rolling_origin_folds(
 ) -> list[Fold]:
     """Place ``n_folds`` test windows walking back from ``end``, skipping data gaps.
 
-    A window that would overlap a gap is moved so it ends at that gap's start.
+    A window that would overlap a gap is moved so it ends at that gap's start, floored to the
+    15-min grid (gap starts are observation times, e.g. 23:55); all fold boundaries therefore
+    sit on bucket boundaries, as issue and target times do.
 
     Args:
         data_start: Earliest usable time; windows may not start before it.
@@ -64,14 +80,14 @@ def rolling_origin_folds(
     """
     length = timedelta(days=test_days)
     windows: list[tuple[datetime, datetime]] = []
-    cursor = end
+    cursor = floor_to_grid(end)
     while len(windows) < n_folds:
         start = cursor - length
         if start < data_start:
             raise ValueError(f"only {len(windows)} gap-free test windows fit after {data_start}")
         overlapping = [g for g in gaps if g.start < cursor and g.end > start]
         if overlapping:
-            cursor = max(g.start for g in overlapping)
+            cursor = floor_to_grid(max(g.start for g in overlapping))
             continue
         windows.append((start, cursor))
         cursor = start

@@ -51,3 +51,20 @@ def test_no_fold_overlaps_a_gap() -> None:
 def test_not_enough_data_raises() -> None:
     with pytest.raises(ValueError):
         rolling_origin_folds(datetime(2026, 6, 1, tzinfo=UTC), datetime(2026, 7, 1, tzinfo=UTC), [])
+
+
+def test_fold_boundaries_snap_to_grid_when_gap_starts_off_grid() -> None:
+    # Format B's last reading is 2026-06-30 23:55; the gap to the collector starts there
+    gap = Gap(
+        datetime(2026, 6, 30, 23, 55, tzinfo=UTC),
+        datetime(2026, 10, 15, 15, 8, tzinfo=UTC),
+        "hist_b",
+        "live",
+    )
+    folds = rolling_origin_folds(
+        datetime(2024, 5, 2, tzinfo=UTC), datetime(2026, 7, 1, tzinfo=UTC), [gap]
+    )
+    assert folds[-1].test_end == datetime(2026, 6, 30, 23, 45, tzinfo=UTC)
+    for f in folds:
+        for ts in (f.train_end, f.test_start, f.test_end):
+            assert ts.minute % 15 == 0 and ts.second == 0
