@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest collect collector-up collector-down collector-logs health lint typecheck pytest test
+.PHONY: setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest error-analysis collect collector-up collector-down collector-logs health lint typecheck pytest test
 
 -include .env
 export
@@ -42,6 +42,9 @@ eda:
 
 backtest:
 	uv run python -m dockcast.experiments.$(shell echo $(E) | tr A-Z a-z)
+
+error-analysis:
+	uv run python -m dockcast.evaluation.error_analysis
 
 collect:
 	uv run python -m dockcast.ingest.collector
