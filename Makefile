@@ -41,7 +41,7 @@ eda:
 	uv run python -m dockcast.quality.eda
 
 backtest:
-	uv run python -m dockcast.experiments.$(shell echo $(E) | tr A-Z a-z)_baselines
+	uv run python -m dockcast.experiments.$(shell echo $(E) | tr A-Z a-z)
 
 collect:
 	uv run python -m dockcast.ingest.collector

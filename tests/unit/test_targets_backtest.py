@@ -29,6 +29,7 @@ def make_panel(days: int = 15, stations: tuple[int, ...] = (1, 2)) -> pd.DataFra
                     "station_key": key,
                     "state_ts": times + pd.Timedelta(minutes=15),
                     "bikes": ((idx % (7 * 96)) + key) % 25,
+                    "docks": 30 - (((idx % (7 * 96)) + key) % 25),
                     "target_ok": True,
                     "rebalance_flag": False,
                     "capacity": 30.0,
@@ -37,6 +38,7 @@ def make_panel(days: int = 15, stations: tuple[int, ...] = (1, 2)) -> pd.DataFra
         )
     panel = pd.concat(frames, ignore_index=True)
     panel["bikes"] = panel["bikes"].astype(float)
+    panel["docks"] = panel["docks"].astype(float)
     return panel
 
 

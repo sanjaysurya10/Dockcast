@@ -84,6 +84,11 @@ def store_results(engine: Engine, run_id: str, experiment: str, results: pd.Data
         "mae",
         "rmse",
         "mase",
+        "pinball_p10",
+        "pinball_p50",
+        "pinball_p90",
+        "coverage_80",
+        "interval_width",
     ]
     records: list[dict[str, object]] = [
         {"run_id": run_id, "experiment": experiment, **{str(k): v for k, v in row.items()}}

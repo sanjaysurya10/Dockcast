@@ -27,6 +27,7 @@ PANEL_SQL = text(
     SELECT b.station_key,
            b.ts + INTERVAL '15 minutes' AS state_ts,
            b.bikes_last AS bikes,
+           b.docks_last AS docks,
            (b.n_obs > 0 AND NOT b.is_closed AND NOT b.is_imputed AND NOT b.flatline_flag)
                AS target_ok,
            b.rebalance_flag,
@@ -49,13 +50,14 @@ def load_panel(engine: Engine, start: datetime, end: datetime) -> pd.DataFrame:
         end: Exclusive latest bucket start.
 
     Returns:
-        Columns ``station_key, state_ts, bikes, target_ok, rebalance_flag, capacity``.
+        Columns ``station_key, state_ts, bikes, docks, target_ok, rebalance_flag, capacity``.
     """
     with engine.connect() as conn:
         result = conn.execute(PANEL_SQL, {"start": start, "end": end})
         frame = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
     frame["state_ts"] = pd.to_datetime(frame["state_ts"], utc=True)
     frame["bikes"] = frame["bikes"].astype(float)
+    frame["docks"] = frame["docks"].astype(float)
     frame["capacity"] = pd.to_numeric(frame["capacity"], errors="coerce")
     frame["target_ok"] = frame["target_ok"].astype(bool)
     frame["rebalance_flag"] = frame["rebalance_flag"].astype(bool)

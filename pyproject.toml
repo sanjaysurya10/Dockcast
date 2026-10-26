@@ -31,7 +31,9 @@ dev = [
     "testcontainers[postgres]>=4.7",
 ]
 ml = [
+    "lightgbm>=4.5",
     "mlflow>=2.17",
+    "scikit-learn>=1.5",
 ]
 report = [
     "matplotlib>=3.9",
@@ -68,6 +70,10 @@ strict = true
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
 files = ["dockcast"]
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*"]  # scikit-learn ships no type information
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
