@@ -140,6 +140,7 @@ def render_section(
     outcomes: Sequence[FoldOutcome],
     results: pd.DataFrame,
     champions: pd.DataFrame,
+    iterations: dict[str, int] | None = None,
 ) -> str:
     """The E1 section of ``reports/experiments.md``."""
     summary = summarise(results)
@@ -184,6 +185,13 @@ def render_section(
             "",
             f"**S1** (+60 MAE <= 0.85 x persistence = {target:.3f}): lgbm_global {got:.3f} -> "
             f"**{verdict}** (MASE {float(h60['lgbm_global']['mase']):.3f}).",
+        ]
+    if iterations:
+        capped = sum(1 for v in iterations.values() if v >= 2000)
+        lines += [
+            "",
+            f"LightGBM boosters that used all 2000 rounds without early stopping: {capped} of "
+            f"{len(iterations)} (PRD 12.3 defaults; tuning is a v2 task).",
         ]
     rows = (
         pd.DataFrame(
@@ -252,6 +260,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         else load_project_config().forecast.horizons_min
     )
     setup_mlflow(EXPERIMENT)
+    commit = git_commit()  # at start: the code that actually runs
     with mlflow.start_run(run_name="e1") as active:
         run_id = active.info.run_id
         outcomes, results, iterations = run(engine, folds, gaps, horizons, make_models)
@@ -264,7 +273,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "n_folds": len(folds),
                 "test_start": folds[0].test_start.isoformat(),
                 "test_end": folds[-1].test_end.isoformat(),
-                "git_commit": git_commit(),
+                "git_commit": commit,
                 "data_source": "hist_b",
                 "train_rows": "hourly issue times; valid = last training week (15-min)",
                 "features": ",".join(feature_columns()),
@@ -285,7 +294,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         stored = store_results(engine, run_id, EXPERIMENT, results)
     if args.folds is None and args.horizons is None:
         write_folds(folds)
-        section = render_section(run_id, folds, outcomes, results, champions)
+        section = render_section(run_id, folds, outcomes, results, champions, iterations)
         replace_section(REPORTS / "experiments.md", EXPERIMENT, section)
     log.info("e1_done", run_id=run_id, results_rows=stored, predictions=predictions)
 
