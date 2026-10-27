@@ -1,5 +1,28 @@
 # Changelog
 
+## M5 — Serving v1 (2026-10-27)
+
+- Production training (`make train`, `dockcast/serving/train.py`): `lgbm_global` quantiles on
+  Format B to 2026-06-30 with the E1 fold procedure (last week for early stopping); bundle
+  `lgbm-q-2026-06-30-3c421b6`, MLflow run `5c34442ebc3a4b46aca09893377ab030`, 115 stations. Backtest
+  metrics in `model_versions` come from E1 run `fb0d738826974ae9982cc4e96b96e5ba`. 8 of 9 boosters
+  stop at or near the 2000-round cap (as in E1).
+- Forecast job (`make forecast`, `--loop`; Oracle VM `forecast` service): every 15 min + 60 s,
+  incremental resample of live rows, P10/P50/P90 at +30/+60/+120, upsert into `forecasts`; skips
+  when live data is older than 30 min. Stations are matched by feed `source_id`, so local and
+  hosted station keys may differ. First cycles on Supabase: 342 rows per cycle (114 stations x 3);
+  station 118 is not in the training set and has no forecast until the next retrain.
+- API (`make serve`, local only; public deploy is M17): `/health`, `/v1/cities`,
+  `/v1/cities/{city}/stations`, `/v1/stations/{key}`, `/v1/stations/{key}/forecast`,
+  `/v1/model/summary`; PRD 15.3 error body, 503 + `Retry-After` when data is older than 30 min,
+  per-IP limit 60/min. slowapi's middleware cannot see routes inside FastAPI 0.162 included
+  routers, so the limit is applied by an app middleware using slowapi's limiter backend.
+- Results page (`make results`): `reports/site/index.html`, built from the generated reports.
+- `calendar_days` populated on Supabase (2021-09-01 to 2027-08-31).
+- Dependencies: `fastapi`, `uvicorn`, `slowapi`; `serve` group (`lightgbm`) in the worker image,
+  which now installs `libgomp1`.
+- Not yet verified: forecasts table filled every 15 min for 48 h (acceptance; m5 tag after).
+
 ## M4 — LightGBM + ridge (2026-10-26)
 
 - Features PRD 10.2-10.4 (`dockcast/features/matrix.py`, groups in `features/registry.py`): lags

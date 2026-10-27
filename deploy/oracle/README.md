@@ -88,7 +88,25 @@ GitHub → repository → *Settings → Secrets and variables → Actions* → n
 `DATABASE_URL` = the same URL as step 1.3 (optional: `CONTACT_EMAIL`).
 Workflow `collector-fallback` runs every 5 min and logs `primary_healthy_skip` while the VM polls.
 
-## 7. Checks
+## 7. Forecast job (M5)
+
+On the research machine, train the production bundle (`make train`, writes
+`data/models/<bundle_id>/` and an MLflow `train` run), then copy it to the VM and start the job:
+
+```bash
+# research machine (from data/models)
+tar czf - <bundle_id> | ssh ubuntu@<public-ip>   'sudo tar xzf - -C /var/lib/dockcast/data/models && sudo chown -R 10001:10001 /var/lib/dockcast/data/models'
+# VM
+$C run --rm --no-deps -v /opt/dockcast/data/reference:/app/data/reference:ro   weather-forecast python -m dockcast.ingest.calendar      # calendar_days (once, and after terms.csv edits)
+$C up -d --build forecast
+$C logs --tail 5 forecast       # expect: forecast_written issued_at=... rows=342 every 15 min (+60 s)
+```
+
+The job loads the newest bundle in `/var/lib/dockcast/data/models`, marks it champion in
+`model_versions`, and skips a cycle when the newest live row is older than 30 min. Stations not
+in the bundle's training set get no forecast until the next retrain.
+
+## 8. Checks
 
 ```bash
 $C run --rm collector python -m dockcast.quality.health   # last 24 h uptime, target >= 95%
