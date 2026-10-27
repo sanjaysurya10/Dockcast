@@ -29,6 +29,11 @@ class EnvSettings(BaseSettings):
     data_dir: Path = PROJECT_ROOT / "data"
 
     @property
+    def models_dir(self) -> Path:
+        """Where production model bundles live (``<data_dir>/models``)."""
+        return self.data_dir / "models"
+
+    @property
     def user_agent(self) -> str:
         """User-Agent sent to data sources (PRD 21): ``DockCast/<version> (<contact>)``."""
         from dockcast import __version__
@@ -94,6 +99,14 @@ class CleaningConfig(BaseModel):
     capacity_tolerance: int = Field(ge=0)
 
 
+class ServingConfig(BaseModel):
+    """Forecast job and API freshness rules (PRD 6.2, 15.3)."""
+
+    run_offset_s: int = Field(ge=0, lt=900)
+    stale_after_min: int = Field(ge=1)
+    api_rate_limit: str
+
+
 class ProjectConfig(BaseModel):
     """Contents of `config/settings.toml`."""
 
@@ -103,6 +116,7 @@ class ProjectConfig(BaseModel):
     collector: CollectorConfig
     retention: RetentionConfig
     cleaning: CleaningConfig
+    serving: ServingConfig
 
 
 class CityConfig(BaseModel):

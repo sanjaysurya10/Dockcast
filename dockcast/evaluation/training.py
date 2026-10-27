@@ -92,3 +92,45 @@ def prepare_fold(
         featured = feature_matrix(grid, rows, horizon_min, calendar, station_info, encoding)
         frames[name] = add_slices(featured)
     return FoldData(frames["train"], frames["valid"], frames["test"])
+
+
+def prepare_training(
+    panel: pd.DataFrame,
+    train_end: datetime,
+    horizon_min: int,
+    gaps: Sequence[Gap],
+    calendar: pd.DataFrame,
+    station_info: pd.DataFrame,
+    data_start: datetime,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
+    """Train / valid rows for a production model: the fold procedure without a test window.
+
+    Args:
+        panel: States from ``data_start``; only states before ``train_end`` are used.
+        train_end: Every target time is ``< train_end``.
+        horizon_min: Horizon in minutes.
+        gaps: Data gaps.
+        calendar: ``calendar_days`` rows.
+        station_info: ``station_key, lat, lon``.
+        data_start: First usable state time.
+
+    Returns:
+        Train rows, valid rows (both with valid targets only) and the station x hour encoding.
+    """
+    step = timedelta(minutes=15)
+    end = pd.Timestamp(train_end)
+    known = panel[panel["state_ts"] < end]
+    valid_start = train_end - VALID_WINDOW
+    grid = build_grid(known, gaps, end - step)
+    encoding = fit_station_hour_encoding(known, end)
+    first = pd.Timestamp(data_start).tz_convert("UTC").ceil("h") + LOOKBACK
+    spans = {
+        "train": hourly_issue_times(first, valid_start - step, horizon_min),
+        "valid": issue_times(valid_start, train_end - step, horizon_min),
+    }
+    frames: dict[str, pd.DataFrame] = {}
+    for name, times in spans.items():
+        rows = targets(known, times, horizon_min)
+        rows = rows[rows["target_ok"]].reset_index(drop=True)
+        frames[name] = feature_matrix(grid, rows, horizon_min, calendar, station_info, encoding)
+    return frames["train"], frames["valid"], encoding

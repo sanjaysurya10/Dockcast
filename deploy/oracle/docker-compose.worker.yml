@@ -26,3 +26,18 @@ services:
     env_file: .env
     restart: unless-stopped
     logging: *logging
+
+  # Forecast job (PRD 6.2, M5): every 15 min (+60 s) resample recent live rows, predict
+  # P10/P50/P90 at +30/+60/+120 and upsert `forecasts`. Uses the newest model bundle in
+  # /var/lib/dockcast/data/models (copied from the research machine after `make train`).
+  forecast:
+    build:
+      context: ../..
+    command: ["python", "-m", "dockcast.serving.forecast", "--loop"]
+    env_file: .env
+    environment:
+      DATA_DIR: /app/data
+    volumes:
+      - /var/lib/dockcast/data:/app/data:ro
+    restart: unless-stopped
+    logging: *logging
