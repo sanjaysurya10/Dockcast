@@ -14,6 +14,8 @@ gap_min = 120
 [spatial]
 neighbour_k = 5                       # PRD 10.5
 neighbour_radius_m = 600
+e4_radii_m = [400, 600, 800]          # PRD 10.5 / E4: radii compared ...
+e4_sweep_horizon_min = 60             # ... at this horizon; others use neighbour_radius_m (owner 2026-10-30)
 
 [collector]
 poll_interval_s = 60                  # PRD 9.1

@@ -69,6 +69,8 @@ class SpatialConfig(BaseModel):
 
     neighbour_k: int
     neighbour_radius_m: float
+    e4_radii_m: list[float]
+    e4_sweep_horizon_min: int
 
 
 class CollectorConfig(BaseModel):

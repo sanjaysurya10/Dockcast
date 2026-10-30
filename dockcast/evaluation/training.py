@@ -20,6 +20,7 @@ import pandas as pd
 from dockcast.evaluation.backtest import add_slices
 from dockcast.evaluation.splits import Fold
 from dockcast.features.matrix import build_grid, feature_matrix, fit_station_hour_encoding
+from dockcast.features.spatial import neighbour_sets
 from dockcast.quality.gaps import Gap
 from dockcast.targets.regression import issue_times, targets
 
@@ -59,6 +60,8 @@ def prepare_fold(
     calendar: pd.DataFrame,
     station_info: pd.DataFrame,
     data_start: datetime,
+    neighbour_radii: Sequence[float] = (),
+    neighbour_k: int = 5,
 ) -> FoldData:
     """Build train / valid / test rows with features, targets and slice columns.
 
@@ -70,6 +73,8 @@ def prepare_fold(
         calendar: ``calendar_days`` rows.
         station_info: ``station_key, lat, lon``.
         data_start: First usable state time.
+        neighbour_radii: Radii (m) whose spatial features are added (PRD 10.5, E4).
+        neighbour_k: Neighbours per station.
 
     Returns:
         The fold's data. Train/valid keep only valid targets; test keeps all rows.
@@ -78,6 +83,9 @@ def prepare_fold(
     valid_start = fold.train_end - VALID_WINDOW
     grid = build_grid(panel, gaps, pd.Timestamp(fold.test_end))
     encoding = fit_station_hour_encoding(panel, pd.Timestamp(fold.train_end))
+    neighbours = [
+        neighbour_sets(grid.stations, station_info, neighbour_k, r) for r in neighbour_radii
+    ]
     first = pd.Timestamp(data_start).tz_convert("UTC").ceil("h") + LOOKBACK
     spans = {
         "train": hourly_issue_times(first, valid_start - step, horizon_min),
@@ -89,7 +97,9 @@ def prepare_fold(
         rows = targets(panel, times, horizon_min)
         if name != "test":
             rows = rows[rows["target_ok"]].reset_index(drop=True)
-        featured = feature_matrix(grid, rows, horizon_min, calendar, station_info, encoding)
+        featured = feature_matrix(
+            grid, rows, horizon_min, calendar, station_info, encoding, neighbours
+        )
         frames[name] = add_slices(featured)
     return FoldData(frames["train"], frames["valid"], frames["test"])
 

@@ -17,6 +17,7 @@ import pandas as pd
 
 from dockcast.features.lags import BUCKET, gap_mask
 from dockcast.features.registry import FEATURE_GROUPS
+from dockcast.features.spatial import Neighbours, spatial_columns, spatial_matrices
 from dockcast.quality.gaps import Gap
 
 TZ = "Europe/Dublin"
@@ -162,6 +163,7 @@ def feature_matrix(
     calendar: pd.DataFrame,
     station_info: pd.DataFrame,
     encoding: pd.Series,
+    neighbours: Sequence[Neighbours] = (),
 ) -> pd.DataFrame:
     """Features for ``rows`` (``station_key, issued_at``), all at or before each issue time.
 
@@ -172,9 +174,11 @@ def feature_matrix(
         calendar: ``calendar_days`` rows.
         station_info: ``station_key, lat, lon``.
         encoding: Output of :func:`fit_station_hour_encoding` (training rows only).
+        neighbours: Neighbour sets (one per radius, built on ``grid.stations``); adds the
+            PRD 10.5 spatial columns for each.
 
     Returns:
-        ``rows`` plus every column in :data:`FEATURE_GROUPS`.
+        ``rows`` plus every column in :data:`FEATURE_GROUPS` and any spatial columns.
     """
     col_of = {int(k): i for i, k in enumerate(grid.stations)}
     cols = rows["station_key"].map(col_of).fillna(-1).astype(np.int64).to_numpy()
@@ -211,6 +215,10 @@ def feature_matrix(
         out[column] = cal[column].to_numpy()
     keys = pd.MultiIndex.from_arrays([out["station_key"], out["hour_local"]])
     out["te_station_hour"] = encoding.reindex(keys).to_numpy(dtype=float)
+    for nb in neighbours:
+        matrices = spatial_matrices(grid.bikes, grid.capacity, nb)
+        for name, column in zip(matrices, spatial_columns(nb.radius_m), strict=True):
+            out[column] = _gather(matrices[name], now, cols)
     return out
 
 
