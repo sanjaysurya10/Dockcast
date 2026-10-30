@@ -107,6 +107,15 @@ class ServingConfig(BaseModel):
     api_rate_limit: str
 
 
+class ClusteringConfig(BaseModel):
+    """E3 station clustering (PRD 13)."""
+
+    k_min: int = Field(ge=2)
+    k_max: int = Field(ge=2)
+    min_cell_obs: int = Field(ge=1)
+    seed: int
+
+
 class ProjectConfig(BaseModel):
     """Contents of `config/settings.toml`."""
 
@@ -117,6 +126,7 @@ class ProjectConfig(BaseModel):
     retention: RetentionConfig
     cleaning: CleaningConfig
     serving: ServingConfig
+    clustering: ClusteringConfig
 
 
 class CityConfig(BaseModel):

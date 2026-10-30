@@ -38,3 +38,9 @@ capacity_tolerance = 2                # bikes + docks > capacity + this -> capac
 run_offset_s = 60                     # forecast job runs this long after each 15-min boundary
 stale_after_min = 30                  # live data older than this: no forecast, API answers 503
 api_rate_limit = "60/minute"          # per IP (slowapi) [DECISION]
+
+[clustering]                          # PRD 13 E3
+k_min = 3
+k_max = 8
+min_cell_obs = 20                     # states per (station, day type, hour); fewer -> station left out
+seed = 0
