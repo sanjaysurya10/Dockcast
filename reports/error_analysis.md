@@ -1,6 +1,6 @@
 # Error analysis (v1)
 
-MLflow run `fb0d738826974ae9982cc4e96b96e5ba` (E1) · git `67fa753` · 1805629 scored test rows, folds 1-8, horizons +30, +60, +120 · target 2026-05-06 → 2026-06-30 UTC. Main model `lgbm_global`; errors are prediction - actual (bikes). No weather features.
+MLflow run `e4819616d7034b90abcb3adc882313da` (E1) · git `ccbd462` · 1805629 scored test rows, folds 1-8, horizons +30, +60, +120 · target 2026-05-06 → 2026-06-30 UTC. Main model `lgbm_global`; errors are prediction - actual (bikes). No weather features.
 
 ## 1. Top 10 stations by MAE (+60)
 
