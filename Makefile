@@ -1,7 +1,22 @@
-.PHONY: setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest error-analysis train forecast serve results collect collector-up collector-down collector-logs health lint typecheck pytest test
+.PHONY: all setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest error-analysis train forecast serve results collect collector-up collector-down collector-logs health lint typecheck pytest test
 
 -include .env
 export
+
+# Full reproduction from a fresh clone (PRD 17 M6): data download -> E1 table and reports.
+all:
+	$(MAKE) setup
+	$(MAKE) db-up
+	$(MAKE) backfill
+	$(MAKE) gaps
+	$(MAKE) capacity
+	$(MAKE) calendar
+	$(MAKE) weather
+	$(MAKE) resample
+	$(MAKE) eda
+	$(MAKE) backtest E=E1
+	$(MAKE) error-analysis
+	$(MAKE) results
 
 setup:
 	uv sync

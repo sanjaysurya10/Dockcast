@@ -2,7 +2,7 @@
 
 ## E1 — ML vs baselines (persistence, seasonal naive 7 d, ridge, LightGBM quantiles)
 
-MLflow run `fb0d738826974ae9982cc4e96b96e5ba` · git `f67fa9c` · generated 2026-10-26 04:45 UTC · data 2026-04-28 23:45 → 2026-06-30 23:45 UTC
+MLflow run `e4819616d7034b90abcb3adc882313da` · git `ed13e96` · generated 2026-10-30 02:33 UTC · data 2026-04-28 23:45 → 2026-06-30 23:45 UTC
 
 Rolling origin, 8 test weeks on Format B (PRD 9.1a, 13.1; `reports/folds.json`). Training: hourly issue times on all Format B history before each fold, early stopping on the last training week (15-min). Targets: state at t + h; closed, imputed and flat-lined targets excluded; every model scored on the same common rows. Features: lags, rolling, seasonal, calendar, station static (PRD 10.2-10.4); **no weather**. Means over folds (± std of fold MAE). Coverage = share inside P10-P90 (target 80 %).
 
@@ -28,6 +28,8 @@ Rolling origin, 8 test weeks on Format B (PRD 9.1a, 13.1; `reports/folds.json`).
 - +120: `lgbm_global` (MAE 2.047, coverage 0.797; lowest MAE with coverage in range)
 
 **S1** (+60 MAE <= 0.85 x persistence = 1.463): lgbm_global 1.461 -> **met** (MASE 0.849).
+
+LightGBM boosters that used all 2000 rounds without early stopping: 51 of 72 (PRD 12.3 defaults; tuning is a v2 task).
 
 Test rows per horizon (all folds), issued / valid target / common:
 

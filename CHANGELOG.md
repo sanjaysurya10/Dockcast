@@ -1,5 +1,16 @@
 # Changelog
 
+## M6 — v1 release (2026-10-30)
+
+- README rewritten: E1 results with run IDs, limitations, architecture, reproduction steps, data
+  credits.
+- `make all`: setup, db-up, backfill, gaps, capacity, calendar, weather, resample, eda,
+  `backtest E=E1`, error-analysis, results.
+- E1 rerun at `ed13e96` on the existing local database, MLflow run
+  `e4819616d7034b90abcb3adc882313da`: every E1 table value and every error-analysis value matches
+  run `fb0d738826974ae9982cc4e96b96e5ba`. The download and load steps (`backfill` to `eda`) were
+  not rerun from a fresh clone.
+
 ## M5 — Serving v1 (2026-10-27)
 
 - Production training (`make train`, `dockcast/serving/train.py`): `lgbm_global` quantiles on
