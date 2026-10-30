@@ -63,3 +63,38 @@ MAE by slice at +60 (mean over folds):
 | 7 | 2026-06-16 21:45 | 2026-06-16 23:45 | 2026-06-23 23:45 |
 | 8 | 2026-06-23 21:45 | 2026-06-23 23:45 | 2026-06-30 23:45 |
 
+## E3 — Station behaviour groups (k-means, Ward)
+
+MLflow run `9f7a9d468a8a422b82b98fb0d2a64ffa` · git `a244419` · generated 2026-10-30 15:22 UTC · data 2021-09-30 23:00 → 2026-06-30 23:45 UTC
+
+Profiles: mean occupancy (bikes / capacity in force) per local hour, weekdays (Mon-Fri) and weekends (Sat-Sun) separately, 48 values per station; observed, open, non-imputed, non-flat-lined 15-min states of Format A + B (PRD 9.1a). Stations with any cell under 20 states are left out. K-means (n_init 20, seed 0) for k = 3-8; Ward at the same k. k is chosen by silhouette on the final profiles (data to the end of the last E1 test week).
+
+Stability: **fold ARI** = pairwise adjusted Rand index of labels fitted on data before each of the 8 E1 fold training ends (folds differ by one week on top of years of data, so this is expected to be high); **period ARI** = labels from Format A only (2021-09 to 2024-02) vs Format B only (2024-05 to 2026-06), on stations in both: the stronger test.
+
+| k | silhouette | fold ARI mean | fold ARI min | period ARI (A vs B) | k-means vs Ward ARI |
+|---:|---:|---:|---:|---:|---:|
+| 3 | 0.330 | 0.900 | 0.751 | 0.364 | 0.516 |
+| 4 **(chosen)** | 0.367 | 0.992 | 0.984 | 0.530 | 0.433 |
+| 5 | 0.325 | 0.936 | 0.870 | 0.428 | 0.406 |
+| 6 | 0.317 | 0.784 | 0.619 | 0.438 | 0.665 |
+| 7 | 0.318 | 0.981 | 0.939 | 0.398 | 0.662 |
+| 8 | 0.322 | 0.991 | 0.964 | 0.446 | 0.687 |
+
+Stations clustered: 116; period ARI on 114 stations in both formats. Left out: STATION118 (115).
+
+At k = 4: fold ARI 0.992 (min 0.984); period ARI 0.530, so groups fitted on Format A only partly match those fitted on Format B; k-means and Ward agree at ARI 0.433.
+
+Clusters at k = 4 (ids ordered by mean occupancy; mean over member stations):
+
+| cluster | stations | weekday mean | weekday 08:00 | weekday 18:00 | weekend mean | closest to centre |
+|---:|---:|---:|---:|---:|---:|---|
+| 0 | 48 | 0.26 | 0.26 | 0.19 | 0.20 | MERRION SQUARE SOUTH; NEWMAN HOUSE; FITZWILLIAM SQUARE WEST |
+| 1 | 28 | 0.42 | 0.36 | 0.40 | 0.39 | ROYAL HOSPITAL; GEORGES LANE; ROTHE ABBEY |
+| 2 | 16 | 0.38 | 0.36 | 0.39 | 0.51 | YORK STREET EAST; FREDERICK STREET SOUTH; LEINSTER STREET SOUTH |
+| 3 | 24 | 0.57 | 0.48 | 0.65 | 0.71 | TALBOT STREET; CUSTOM HOUSE; CATHAL BRUGHA STREET |
+
+![](figures/e3_profiles.png)
+
+![](figures/e3_cluster_map.png)
+
+Cluster labels describe historical occupancy only; they are not inferred trip purposes. Per-fold labels for later experiments are fitted in-fold (PRD 19.2).

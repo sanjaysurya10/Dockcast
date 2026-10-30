@@ -1,5 +1,24 @@
 # Changelog
 
+## M7 — Station clustering, E3 (2026-10-30)
+
+- Profiles (`dockcast/features/station.py`): mean occupancy (bikes / capacity in force) per local
+  hour, weekdays and weekends, 48 values per station, from observed, open, non-imputed,
+  non-flat-lined 15-min states with `state_ts < cutoff`; Format A + B (PRD 9.1a). Stations with
+  any cell under 20 states are left out (`[clustering]` in `config/settings.toml`).
+- Clustering (`dockcast/models/clustering.py`): k-means (n_init 20, seed 0) and Ward; cluster ids
+  ordered by mean occupancy; silhouette; ARI on shared stations.
+- E3 (`make backtest E=E3`), MLflow run `9f7a9d468a8a422b82b98fb0d2a64ffa`: k = 4 chosen by
+  silhouette (0.367, k = 3-8). Fold ARI 0.992 (min 0.984) across labels fitted before each E1
+  fold. Period ARI (Format A only vs Format B only, 114 stations) 0.530 — groups only partly
+  persist across the two periods (owner decision 2026-10-30: report both). K-means vs Ward ARI
+  0.433. 116 stations clustered (48 / 28 / 16 / 24); STATION118 (live only) left out.
+- Outputs: E3 section of `reports/experiments.md`, `reports/figures/e3_profiles.png`,
+  `reports/figures/e3_cluster_map.png`, per-fold labels
+  `data/processed/e3_fold_labels_<run>.parquet` for M8/M9, `stations.cluster_id` (local DB).
+- Tests: profile filters, capacity in force, DST-day local hours (integration); profiles and
+  labels unchanged when data from the cutoff changes (leakage); clustering helpers (unit).
+
 ## M6 — v1 release (2026-10-30)
 
 - README rewritten: E1 results with run IDs, limitations, architecture, reproduction steps, data
