@@ -1,5 +1,29 @@
 # Changelog
 
+## M8 — Spatial features, E4 (2026-10-31)
+
+- Neighbour features (`dockcast/features/spatial.py`, PRD 10.5): the 5 nearest stations within
+  the radius (haversine). Features are their mean occupancy ratio, mean change over the last
+  hour, count at 0 bikes, total bikes within the radius, and the inverse-distance-weighted mean
+  ratio. All are read at or before the issue time, and buckets inside a gap stay missing.
+  Columns carry the radius (`nb600_*`) and are passed through `feature_matrix` /
+  `prepare_fold`.
+- E4 (`make backtest E=E4`), MLflow run `a972985884564e83aa5b120428bd5c74`: A = E1
+  `lgbm_global` (run `e4819616d7034b90abcb3adc882313da`), B = A + neighbours, scored on rows
+  common to both. Radii were 600 m at +30 and +120, and 400 / 600 / 800 m at +60 (owner decision
+  2026-10-30). B beats A at every horizon, but by very little:
+  - ΔMAE −0.004 at +30, −0.005 to −0.006 at +60, −0.006 at +120 (bikes). This is about 0.4%,
+    well inside the fold spread (± 0.05–0.08).
+  - B wins 7–8 of 8 folds.
+  - The radius makes no practical difference: at +60 all three radii are within 0.001 MAE.
+  - Rush hour gains the most among regular slices (−0.008 to −0.011).
+  - No weather.
+- Slice table per horizon, including in-fold E3 clusters (run
+  `9f7a9d468a8a422b82b98fb0d2a64ffa`), in the E4 section of `reports/experiments.md`.
+- Tests: hand-computed neighbour values and radius / k limits (unit). Spatial features are
+  unchanged when data after the issue time is deleted or poisoned, and are missing inside gaps
+  (leakage). Joining A and scoring mixed radii per horizon (unit).
+
 ## M7 — Station clustering, E3 (2026-10-30)
 
 - Profiles (`dockcast/features/station.py`): mean occupancy (bikes / capacity in force) per local

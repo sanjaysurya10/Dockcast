@@ -98,3 +98,89 @@ Clusters at k = 4 (ids ordered by mean occupancy; mean over member stations):
 ![](figures/e3_cluster_map.png)
 
 Cluster labels describe historical occupancy only; they are not inferred trip purposes. Per-fold labels for later experiments are fitted in-fold (PRD 19.2).
+
+## E4 — Spatial features (A: no spatial vs B: + neighbours)
+
+MLflow run `a972985884564e83aa5b120428bd5c74` · git `ee3679f` · generated 2026-10-30 23:56 UTC · data 2026-05-05 23:45 → 2026-06-30 23:45 UTC
+
+A = `lgbm_global` from E1 run `e4819616d7034b90abcb3adc882313da` (same folds, rows and training). B = the same model plus PRD 10.5 neighbour features: the 5 nearest stations within the radius (haversine); neighbours' mean occupancy ratio and mean change over the last hour, neighbours with 0 bikes, total bikes at every station within the radius, inverse-distance-weighted mean ratio; all read at or before the issue time. Scored on rows common to E1 and E4. Cluster slice: E3 run `9f7a9d468a8a422b82b98fb0d2a64ffa`, labels fitted in-fold. Radii per horizon (owner decision 2026-10-30, to fit the compute budget): +30: 600 m; +60: 400 m / 600 m / 800 m; +120: 600 m. **No weather.** Every radius run is reported; none is selected on the test weeks.
+
+| horizon | model | MAE | ± | MASE | bias | coverage P10-P90 | width | rows |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| +30 | lgbm_spatial_600 | 0.990 | 0.049 | 0.930 | -0.002 | 0.823 | 3.09 | 604621 |
+| +30 | lgbm_global | 0.995 | 0.050 | 0.933 | -0.002 | 0.825 | 3.10 | 604621 |
+| +30 | persistence | 1.066 | 0.058 | 1.000 | +0.000 | — | — | 604621 |
+| +60 | lgbm_spatial_400 | 1.455 | 0.060 | 0.846 | -0.037 | 0.812 | 4.59 | 602561 |
+| +60 | lgbm_spatial_800 | 1.455 | 0.060 | 0.846 | -0.038 | 0.812 | 4.58 | 602561 |
+| +60 | lgbm_spatial_600 | 1.456 | 0.061 | 0.846 | -0.036 | 0.811 | 4.58 | 602561 |
+| +60 | lgbm_global | 1.461 | 0.061 | 0.849 | -0.042 | 0.814 | 4.59 | 602561 |
+| +60 | persistence | 1.721 | 0.087 | 1.000 | +0.001 | — | — | 602561 |
+| +120 | lgbm_spatial_600 | 2.041 | 0.078 | 0.738 | -0.098 | 0.797 | 6.38 | 598447 |
+| +120 | lgbm_global | 2.047 | 0.075 | 0.740 | -0.099 | 0.797 | 6.44 | 598447 |
+| +120 | persistence | 2.768 | 0.141 | 1.000 | +0.002 | — | — | 598447 |
+
+Folds where B beats A (overall MAE), per horizon:
+
+- +30: lgbm_spatial_600: 8/8
+- +60: lgbm_spatial_400: 7/8, lgbm_spatial_600: 7/8, lgbm_spatial_800: 8/8
+- +120: lgbm_spatial_600: 7/8
+
+ΔMAE (B - A, bikes; negative = B better) by slice at +30, mean over folds:
+
+| slice | value | rows | MAE A | Δ 600 m |
+|---|---|---:|---:|---:|
+| overall | all | 604621 | 0.995 | -0.004 |
+| rush_hour | other | 454115 | 0.791 | -0.002 |
+| rush_hour | rush | 150506 | 1.611 | -0.010 |
+| weekend | weekday | 430760 | 1.094 | -0.005 |
+| weekend | weekend | 173861 | 0.749 | -0.003 |
+| capacity_band | 20-29 | 152074 | 0.966 | -0.004 |
+| capacity_band | 30-39 | 222563 | 0.981 | -0.003 |
+| capacity_band | 40+ | 219374 | 1.037 | -0.006 |
+| capacity_band | <20 | 10610 | 0.814 | -0.006 |
+| rebalance | flagged | 4094 | 11.692 | -0.100 |
+| rebalance | normal | 600527 | 0.922 | -0.004 |
+| cluster | 0 | 250569 | 0.795 | -0.003 |
+| cluster | 1 | 145695 | 1.061 | -0.004 |
+| cluster | 2 | 86632 | 1.130 | -0.005 |
+| cluster | 3 | 121725 | 1.230 | -0.006 |
+
+ΔMAE (B - A, bikes; negative = B better) by slice at +60, mean over folds:
+
+| slice | value | rows | MAE A | Δ 400 m | Δ 600 m | Δ 800 m |
+|---|---|---:|---:|---:|---:|---:|
+| overall | all | 602561 | 1.461 | -0.006 | -0.005 | -0.005 |
+| rush_hour | other | 452061 | 1.203 | -0.004 | -0.003 | -0.004 |
+| rush_hour | rush | 150500 | 2.235 | -0.009 | -0.011 | -0.011 |
+| weekend | weekday | 428702 | 1.596 | -0.006 | -0.006 | -0.006 |
+| weekend | weekend | 173859 | 1.127 | -0.004 | -0.003 | -0.003 |
+| capacity_band | 20-29 | 151551 | 1.382 | -0.006 | -0.006 | -0.006 |
+| capacity_band | 30-39 | 221809 | 1.454 | -0.004 | -0.004 | -0.004 |
+| capacity_band | 40+ | 218627 | 1.539 | -0.007 | -0.006 | -0.006 |
+| capacity_band | <20 | 10574 | 1.126 | -0.007 | -0.003 | -0.007 |
+| rebalance | flagged | 4092 | 11.307 | -0.040 | -0.046 | -0.032 |
+| rebalance | normal | 598469 | 1.394 | -0.005 | -0.005 | -0.005 |
+| cluster | 0 | 249716 | 1.188 | -0.005 | -0.005 | -0.006 |
+| cluster | 1 | 145197 | 1.567 | -0.005 | -0.006 | -0.006 |
+| cluster | 2 | 86335 | 1.661 | -0.009 | -0.006 | -0.006 |
+| cluster | 3 | 121313 | 1.753 | -0.004 | -0.004 | -0.005 |
+
+ΔMAE (B - A, bikes; negative = B better) by slice at +120, mean over folds:
+
+| slice | value | rows | MAE A | Δ 600 m |
+|---|---|---:|---:|---:|
+| overall | all | 598447 | 2.047 | -0.006 |
+| rush_hour | other | 447955 | 1.776 | -0.006 |
+| rush_hour | rush | 150492 | 2.854 | -0.008 |
+| weekend | weekday | 424590 | 2.229 | -0.006 |
+| weekend | weekend | 173857 | 1.604 | -0.007 |
+| capacity_band | 20-29 | 150509 | 1.879 | -0.011 |
+| capacity_band | 30-39 | 220301 | 2.065 | -0.002 |
+| capacity_band | 40+ | 217135 | 2.172 | -0.007 |
+| capacity_band | <20 | 10502 | 1.472 | -0.017 |
+| rebalance | flagged | 4081 | 10.347 | -0.031 |
+| rebalance | normal | 594366 | 1.990 | -0.006 |
+| cluster | 0 | 248014 | 1.688 | -0.005 |
+| cluster | 1 | 144201 | 2.216 | -0.003 |
+| cluster | 2 | 85743 | 2.322 | -0.011 |
+| cluster | 3 | 120489 | 2.387 | -0.009 |
