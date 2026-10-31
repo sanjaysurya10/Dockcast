@@ -1,5 +1,42 @@
 # Changelog
 
+## M9 — Global vs per-station vs per-cluster, and Prophet, E2 (2026-10-31)
+
+- Models:
+  - `dockcast/models/partitioned.py`: one quantile LightGBM per station or per E3 cluster,
+    with the same features, defaults and early stopping as `lgbm_global`.
+  - `dockcast/models/prophet_model.py`: Prophet per station with daily and weekly seasonality
+    and public holidays from `calendar_days`. It is fitted once per fold on hourly observed
+    states before the training end, in local time, and P10-P90 is its 80% interval.
+  - New dependency: `prophet` 1.5.0 (owner approved 2026-10-31).
+- E2 (`make backtest E=E2`), MLflow run `470f72791f044cd39a6a9afd2a061cfd` (code at `fa52bc1`,
+  report re-rendered at `80cd9df` with `--render`). `lgbm_global` comes from E1 run
+  `e4819616d7034b90abcb3adc882313da`; scoring uses rows common to E1 and E2; all 115 stations
+  were run, about 5.5 h in total. MAE in bikes:
+  - `lgbm_per_cluster`: 0.987 / 1.445 / 2.028 at +30 / +60 / +120, against `lgbm_global`
+    0.995 / 1.461 / 2.047. It beats global in 7/8, 8/8 and 8/8 folds, but its P10-P90
+    coverage is lower (0.807 / 0.798 / 0.785 vs 0.825 / 0.814 / 0.797).
+  - `lgbm_per_station`: 1.025 / 1.480 / 2.074, worse than global in every fold, with coverage
+    0.75-0.76.
+  - `prophet_station`: 5.44 at every horizon, because it does not use the current state.
+    It is worse than persistence.
+- Low-data stations, using the PRD's bottom quarter by training rows: per-cluster is again
+  best (8/8 folds at every horizon). **Needs owner review:** within each fold, the stations
+  either side of the quartile boundary differ by only 1-10 training rows, so the PRD
+  definition hardly separates low-data stations in Format B.
+- Outputs:
+  - the E2 section of `reports/experiments.md`;
+  - `reports/figures/e2_low_data.png`;
+  - `data/processed/e2_predictions_<run>.parquet`.
+- `score_all` in E4 now takes the extra slice columns as a parameter.
+- Tests (unit):
+  - each group's model learns only from its own rows; the cluster model pools its stations;
+  - Prophet's daily cycle and intervals, including across the DST change on 29 March;
+  - low-data ties; fold labels;
+  - report section and chart.
+- Tests (leakage): Prophet is unchanged when states after the cutoff are deleted or
+  poisoned.
+
 ## M8 — Spatial features, E4 (2026-10-31)
 
 - Neighbour features (`dockcast/features/spatial.py`, PRD 10.5): the 5 nearest stations within
