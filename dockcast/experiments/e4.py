@@ -148,18 +148,30 @@ def attach_baseline(scored: pd.DataFrame, e1: pd.DataFrame, labels: pd.DataFrame
     return merged.drop(columns="cluster_id")
 
 
-def score_all(merged: pd.DataFrame, names: Sequence[str]) -> pd.DataFrame:
-    """Per-slice metrics for persistence, model A and each model B run at that horizon."""
+def score_all(
+    merged: pd.DataFrame, names: Sequence[str], extra: Sequence[str] = ("cluster",)
+) -> pd.DataFrame:
+    """Per-slice metrics for every model present at that fold and horizon.
+
+    Args:
+        merged: Rows with ``pred_<model>`` columns and slice columns.
+        names: Models; the first must be ``persistence`` (point forecast, no interval).
+        extra: Further slice columns scored on their overall metrics (e.g. ``cluster``).
+
+    Returns:
+        Rows shaped like ``backtest_results``.
+    """
     rows: list[dict[str, object]] = []
     pairs = merged[["fold", "horizon_min"]].drop_duplicates().itertuples(index=False)
     for fold, horizon in sorted((int(f), int(h)) for f, h in pairs):
         part = merged[(merged["fold"] == fold) & (merged["horizon_min"] == horizon)]
         present = [n for n in names if f"pred_{n}" in part and part[f"pred_{n}"].notna().all()]
         rows += score_slices(part, present, fold, horizon, present[1:])
-        for value, sub in part.groupby("cluster"):
-            for rec in score_slices(sub, present, fold, horizon, present[1:]):
-                if rec["slice_kind"] == "overall":
-                    rows.append(rec | {"slice_kind": "cluster", "slice_value": str(value)})
+        for kind in extra:
+            for value, sub in part.groupby(kind):
+                for rec in score_slices(sub, present, fold, horizon, present[1:]):
+                    if rec["slice_kind"] == "overall":
+                        rows.append(rec | {"slice_kind": kind, "slice_value": str(value)})
     return pd.DataFrame(rows)
 
 
