@@ -24,17 +24,36 @@
   best (8/8 folds at every horizon). **Needs owner review:** within each fold, the stations
   either side of the quartile boundary differ by only 1-10 training rows, so the PRD
   definition hardly separates low-data stations in Format B.
+- E2b (`make backtest E=E2b`, owner decision 2026-10-31: simulate low-data stations by
+  truncating histories), MLflow run `01131c8fc80b40b0abad2742db60f700` (code at `c0143af`,
+  about 8 h). A seeded 29 of 115 stations keep only their last 28 days of training
+  (588-672 training rows each, against at least 8193 for the others); their earlier states
+  are removed, so lags, the station x hour encoding and Prophet also see the short history.
+  Every model, `lgbm_global` included, is retrained. MAE in bikes on the short-history
+  stations at +30 / +60 / +120:
+  - `lgbm_global`: 0.995 / 1.476 / 2.100, almost the same as on full-history stations
+    (1.004 / 1.470 / 2.051), so pooling across stations covers short histories well;
+  - `lgbm_per_cluster`: 0.987 / 1.471 / 2.096, better than global in 8/8, 6/8 and 4/8 folds:
+    its edge on short histories is small and gone by +120;
+  - `lgbm_per_station`: 1.634 / 2.108 / 2.821, worse than global in every fold and worse
+    than persistence at +30 and +60;
+  - `prophet_station`: about 6.09 at every horizon.
+  - Caveat: clusters are E3's labels, fitted on the full pre-fold history.
 - Outputs:
   - the E2 section of `reports/experiments.md`;
   - `reports/figures/e2_low_data.png`;
-  - `data/processed/e2_predictions_<run>.parquet`.
+  - the E2b section of `reports/experiments.md` and `reports/figures/e2b_short_history.png`;
+  - `data/processed/e2_predictions_<run>.parquet` and `e2b_predictions_<run>.parquet`.
 - `score_all` in E4 now takes the extra slice columns as a parameter.
 - Tests (unit):
   - each group's model learns only from its own rows; the cluster model pools its stations;
   - Prophet's daily cycle and intervals, including across the DST change on 29 March;
   - low-data ties; fold labels;
   - report section and chart.
+- Tests (unit): E2b station picking is seeded and order-free; truncation keeps only the short
+  window; E2b report section.
 - Tests (leakage): Prophet is unchanged when states after the cutoff are deleted or
+  poisoned; E2b short stations are unchanged when states before their history start are
   poisoned.
 
 ## M8 — Spatial features, E4 (2026-10-31)

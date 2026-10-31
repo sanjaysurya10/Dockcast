@@ -282,3 +282,99 @@ MAE by data amount, mean over folds (folds where the model beats `lgbm_global` o
 | +120 | cluster | 3 | 2.387 | +0.010 | -0.025 | +3.378 |
 | +120 | data_amount | low | 1.615 | +0.015 | -0.031 | +3.116 |
 | +120 | data_amount | rest | 2.187 | +0.031 | -0.014 | +3.487 |
+
+## E2b — Low-data stations by truncated history
+
+MLflow run `01131c8fc80b40b0abad2742db60f700` · git `c0143af` · generated 2026-10-31 21:07 UTC · data 2026-05-05 23:45 → 2026-06-30 23:45 UTC
+
+E2's bottom quarter by training rows barely differs from the other stations (every Format B station has almost the full history). Here 29 stations (25%, seeded random, the same in every fold) keep only their last 28 days of training before each fold's validation week: their earlier states are removed, so lags, the station x hour encoding and Prophet see the short history too. Validation week and test window are unchanged. Training rows per short station: 588-672; per full-history station at least 8193. Every model, `lgbm_global` included, is retrained on this data, with E2's features, LightGBM defaults and early stopping. Clusters are E3 run `9f7a9d468a8a422b82b98fb0d2a64ffa`'s in-fold labels, fitted on the full pre-fold history (a real new station would have a less certain cluster). Short stations: 1, 2, 4, 7, 17, 25, 29, 30, 44, 46, 50, 57, 59, 61, 63, 66, 74, 75, 79, 88, 89, 90, 97, 99, 100, 102, 104, 113, 114. **No weather.**
+
+| horizon | model | MAE | ± | MASE | bias | coverage P10-P90 | width | rows |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| +30 | lgbm_per_cluster | 0.995 | 0.047 | 0.933 | -0.002 | 0.803 | 3.08 | 607950 |
+| +30 | lgbm_global | 1.002 | 0.050 | 0.940 | -0.006 | 0.817 | 3.12 | 607950 |
+| +30 | persistence | 1.066 | 0.057 | 1.000 | +0.001 | — | — | 607950 |
+| +30 | lgbm_per_station | 1.184 | 0.050 | 1.112 | -0.056 | 0.756 | 3.59 | 607950 |
+| +30 | prophet_station | 5.598 | 0.324 | 5.271 | -0.001 | 0.767 | 15.06 | 607950 |
+| +60 | lgbm_per_cluster | 1.462 | 0.058 | 0.849 | -0.050 | 0.793 | 4.48 | 605888 |
+| +60 | lgbm_global | 1.472 | 0.061 | 0.855 | -0.046 | 0.807 | 4.62 | 605888 |
+| +60 | lgbm_per_station | 1.647 | 0.061 | 0.958 | -0.086 | 0.756 | 5.06 | 605888 |
+| +60 | persistence | 1.722 | 0.086 | 1.000 | +0.001 | — | — | 605888 |
+| +60 | prophet_station | 5.599 | 0.323 | 3.263 | +0.001 | 0.768 | 15.07 | 605888 |
+| +120 | lgbm_per_cluster | 2.052 | 0.073 | 0.742 | -0.113 | 0.777 | 6.28 | 601770 |
+| +120 | lgbm_global | 2.063 | 0.076 | 0.746 | -0.107 | 0.788 | 6.43 | 601770 |
+| +120 | lgbm_per_station | 2.270 | 0.079 | 0.821 | -0.147 | 0.744 | 6.94 | 601770 |
+| +120 | persistence | 2.769 | 0.141 | 1.000 | +0.002 | — | — | 601770 |
+| +120 | prophet_station | 5.601 | 0.322 | 2.030 | +0.002 | 0.767 | 15.07 | 601770 |
+
+MAE by history, mean over folds (folds where the model beats `lgbm_global` on that slice in brackets):
+
+| horizon | model | all stations | short history | full history |
+|---:|---|---:|---:|---:|
+| +30 | lgbm_global | 1.002 | 0.995 | 1.004 |
+| +30 | lgbm_per_station | 1.184 (0/8) | 1.634 (0/8) | 1.033 (0/8) |
+| +30 | lgbm_per_cluster | 0.995 (8/8) | 0.987 (8/8) | 0.997 (8/8) |
+| +30 | prophet_station | 5.598 (0/8) | 6.090 (0/8) | 5.433 (0/8) |
+| +60 | lgbm_global | 1.472 | 1.476 | 1.470 |
+| +60 | lgbm_per_station | 1.647 (0/8) | 2.108 (0/8) | 1.493 (0/8) |
+| +60 | lgbm_per_cluster | 1.462 (8/8) | 1.471 (6/8) | 1.459 (8/8) |
+| +60 | prophet_station | 5.599 (0/8) | 6.091 (0/8) | 5.434 (0/8) |
+| +120 | lgbm_global | 2.063 | 2.100 | 2.051 |
+| +120 | lgbm_per_station | 2.270 (0/8) | 2.821 (0/8) | 2.085 (0/8) |
+| +120 | lgbm_per_cluster | 2.052 (8/8) | 2.096 (4/8) | 2.037 (8/8) |
+| +120 | prophet_station | 5.601 (0/8) | 6.093 (0/8) | 5.436 (0/8) |
+
+![MAE on all stations and on short-history stations](figures/e2b_short_history.png)
+
+ΔMAE (model - `lgbm_global`, bikes; negative = better) by slice, mean over folds:
+
+| horizon | slice | value | MAE global | Δ per-station | Δ per-cluster | Δ Prophet |
+|---:|---|---|---:|---:|---:|---:|
+| +30 | rush_hour | other | 0.794 | +0.196 | -0.003 | +4.789 |
+| +30 | rush_hour | rush | 1.625 | +0.141 | -0.019 | +4.017 |
+| +30 | weekend | weekday | 1.101 | +0.188 | -0.009 | +4.408 |
+| +30 | weekend | weekend | 0.755 | +0.168 | -0.003 | +5.064 |
+| +30 | capacity_band | 20-29 | 0.972 | +0.105 | -0.005 | +3.359 |
+| +30 | capacity_band | 30-39 | 0.984 | +0.130 | -0.005 | +4.704 |
+| +30 | capacity_band | 40+ | 1.050 | +0.296 | -0.010 | +5.481 |
+| +30 | capacity_band | <20 | 0.810 | +0.005 | -0.009 | +1.786 |
+| +30 | rebalance | flagged | 11.822 | -0.323 | -0.174 | -4.110 |
+| +30 | rebalance | normal | 0.928 | +0.185 | -0.006 | +4.655 |
+| +30 | cluster | 0 | 0.804 | +0.236 | -0.008 | +3.951 |
+| +30 | cluster | 1 | 1.066 | +0.179 | -0.011 | +5.606 |
+| +30 | cluster | 2 | 1.133 | +0.161 | -0.002 | +4.803 |
+| +30 | cluster | 3 | 1.240 | +0.088 | -0.005 | +4.565 |
+| +30 | history | full | 1.004 | +0.029 | -0.007 | +4.429 |
+| +30 | history | short | 0.995 | +0.638 | -0.008 | +5.095 |
+| +60 | rush_hour | other | 1.209 | +0.182 | -0.005 | +4.376 |
+| +60 | rush_hour | rush | 2.258 | +0.156 | -0.023 | +3.383 |
+| +60 | weekend | weekday | 1.608 | +0.180 | -0.010 | +3.902 |
+| +60 | weekend | weekend | 1.134 | +0.164 | -0.008 | +4.684 |
+| +60 | capacity_band | 20-29 | 1.390 | +0.100 | -0.003 | +2.942 |
+| +60 | capacity_band | 30-39 | 1.456 | +0.124 | -0.005 | +4.233 |
+| +60 | capacity_band | 40+ | 1.562 | +0.287 | -0.018 | +4.970 |
+| +60 | capacity_band | <20 | 1.119 | +0.003 | -0.014 | +1.474 |
+| +60 | rebalance | flagged | 11.438 | -0.473 | -0.262 | -3.726 |
+| +60 | rebalance | normal | 1.403 | +0.180 | -0.008 | +4.181 |
+| +60 | cluster | 0 | 1.195 | +0.230 | -0.008 | +3.560 |
+| +60 | cluster | 1 | 1.577 | +0.171 | -0.014 | +5.095 |
+| +60 | cluster | 2 | 1.663 | +0.142 | +0.002 | +4.276 |
+| +60 | cluster | 3 | 1.778 | +0.091 | -0.016 | +4.028 |
+| +60 | history | full | 1.470 | +0.022 | -0.011 | +3.964 |
+| +60 | history | short | 1.476 | +0.632 | -0.005 | +4.615 |
+| +120 | rush_hour | other | 1.785 | +0.209 | -0.008 | +3.802 |
+| +120 | rush_hour | rush | 2.889 | +0.201 | -0.020 | +2.752 |
+| +120 | weekend | weekday | 2.246 | +0.205 | -0.014 | +3.265 |
+| +120 | weekend | weekend | 1.614 | +0.212 | -0.006 | +4.205 |
+| +120 | capacity_band | 20-29 | 1.892 | +0.112 | -0.002 | +2.441 |
+| +120 | capacity_band | 30-39 | 2.066 | +0.154 | -0.009 | +3.624 |
+| +120 | capacity_band | 40+ | 2.208 | +0.336 | -0.021 | +4.327 |
+| +120 | capacity_band | <20 | 1.462 | +0.009 | -0.005 | +1.127 |
+| +120 | rebalance | flagged | 10.323 | -0.360 | -0.118 | -2.605 |
+| +120 | rebalance | normal | 2.006 | +0.211 | -0.011 | +3.579 |
+| +120 | cluster | 0 | 1.704 | +0.269 | -0.011 | +3.053 |
+| +120 | cluster | 1 | 2.231 | +0.188 | -0.017 | +4.441 |
+| +120 | cluster | 2 | 2.326 | +0.136 | -0.005 | +3.620 |
+| +120 | cluster | 3 | 2.415 | +0.151 | -0.010 | +3.393 |
+| +120 | history | full | 2.051 | +0.035 | -0.014 | +3.385 |
+| +120 | history | short | 2.100 | +0.721 | -0.004 | +3.993 |
