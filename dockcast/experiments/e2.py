@@ -186,22 +186,28 @@ def slice_mae(results: pd.DataFrame, kind: str, value: str) -> pd.DataFrame:
     return part.groupby(["horizon_min", "model_name"])["mae"].mean().unstack()
 
 
-def plot_low_data(results: pd.DataFrame, path: Path) -> None:
-    """MAE per model on all stations vs low-data stations, one panel per horizon."""
+def plot_low_data(
+    results: pd.DataFrame,
+    path: Path,
+    kind: str = "data_amount",
+    value: str = "low",
+    label: str = "Low-data stations (bottom quarter)",
+) -> None:
+    """MAE per model on all stations vs one slice (low-data stations), one panel per horizon."""
     all_mae = slice_mae(results, "overall", "all")
-    low_mae = slice_mae(results, "data_amount", "low")
+    low_mae = slice_mae(results, kind, value)
     horizons = list(all_mae.index)
     fig, axes = plt.subplots(1, len(horizons), figsize=(12, 4.2), facecolor=SURFACE)
     axes = np.atleast_1d(axes)
     x = np.arange(len(MODELS))
     width = 0.38
     for ax, h in zip(axes, horizons, strict=True):
-        for offset, frame, label, color in (
+        for offset, frame, name, color in (
             (-width / 2, all_mae, "All stations", SERIES[0]),
-            (width / 2, low_mae, "Low-data stations (bottom quarter)", SERIES[1]),
+            (width / 2, low_mae, label, SERIES[1]),
         ):
             values = frame.loc[h, MODELS].to_numpy(dtype=float)
-            bars = ax.bar(x + offset, values, width - 0.04, color=color, label=label)
+            bars = ax.bar(x + offset, values, width - 0.04, color=color, label=name)
             ax.bar_label(bars, fmt="%.2f", fontsize=7, color=INK, padding=2)
         ax.set_title(f"+{h} min", color=INK, fontsize=12, loc="left")
         ax.set_xticks(x)
