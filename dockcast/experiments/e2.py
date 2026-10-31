@@ -235,6 +235,7 @@ def render_section(
     """The E2 section of ``reports/experiments.md``."""
     summary = summarise(results)
     low_rows = pd.DataFrame([vars(r) for r in low_info])
+    gap = low_rows["rest_min_rows"] - low_rows["low_max_rows"]
     lines = [
         "## E2 — Global vs per-station vs per-cluster models, and Prophet",
         "",
@@ -265,9 +266,12 @@ def render_section(
         "Low-data stations: per fold and horizon, the "
         f"{int(LOW_DATA_SHARE * 100)}% of stations with the fewest training rows "
         f"({int(low_rows['low'].min())}-{int(low_rows['low'].max())} of "
-        f"{int(low_rows['stations'].max())} stations). Across folds and horizons they have at "
-        f"most {int(low_rows['low_max_rows'].max())} training rows; the other stations have at "
-        f"least {int(low_rows['rest_min_rows'].min())}.",
+        f"{int(low_rows['stations'].max())} stations). Within a fold, the busiest low-data "
+        "station and the least-served other station differ by "
+        f"{int(gap.min())}-{int(gap.max())} training rows (cut-offs "
+        f"{int(low_rows['low_max_rows'].min())}-{int(low_rows['low_max_rows'].max())} rows), so "
+        "the boundary is close to arbitrary: the stations either side of it have almost the "
+        "same history length (definition under owner review).",
         "",
         "MAE by data amount, mean over folds (folds where the model beats `lgbm_global` on that "
         "slice in brackets):",
@@ -316,12 +320,59 @@ def render_section(
     return "\n".join(lines)
 
 
+def write_report(
+    run_id: str,
+    e1_run: str,
+    e3_run: str,
+    folds: Sequence[Fold],
+    results: pd.DataFrame,
+    low_info: Sequence[LowData],
+) -> None:
+    """Write the E2 chart and report section."""
+    plot_low_data(results, FIGURES / "e2_low_data.png")
+    section = render_section(run_id, e1_run, e3_run, folds, results, low_info)
+    replace_section(REPORTS / "experiments.md", EXPERIMENT, section)
+
+
+def render_run(run_id: str) -> None:
+    """Re-render the report from a finished full E2 run's MLflow artifacts."""
+    setup_mlflow(EXPERIMENT)
+    params = mlflow.get_run(run_id).data.params
+    results = pd.read_csv(
+        mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path="results.csv")
+    )
+    results["slice_value"] = results["slice_value"].astype(str)
+    low = pd.read_csv(
+        mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path="low_data.csv")
+    )
+    low_info = [
+        LowData(*(int(v) for v in row))
+        for row in low[list(LowData.__dataclass_fields__)].itertuples(index=False)
+    ]
+    engine = make_engine()
+    with Session(engine) as session:
+        gaps = load_gaps(session)
+    folds = default_folds(engine, gaps)[-int(params["n_folds"]) :]
+    write_report(
+        run_id, params["baseline_e1_run"], params["cluster_e3_run"], folds, results, low_info
+    )
+    log.info("e2_rendered", run_id=run_id, run_commit=params["git_commit"])
+
+
 def main(argv: Sequence[str] | None = None) -> None:
-    """``make backtest E=E2`` (``--folds N``, ``--horizons`` for timing runs)."""
+    """``make backtest E=E2`` (``--folds N``, ``--horizons`` for timing runs).
+
+    ``--render RUN_ID`` rebuilds the report section and chart from a finished run's logged
+    ``results.csv`` and ``low_data.csv`` without training.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--folds", type=int, default=None)
     parser.add_argument("--horizons", type=str, default=None, help="e.g. 60 or 30,60")
+    parser.add_argument("--render", type=str, default=None, help="MLflow run id to re-render")
     args = parser.parse_args(argv)
+    if args.render:
+        render_run(args.render)
+        return
     cfg = load_project_config()
     engine = make_engine()
     with Session(engine) as session:
@@ -375,10 +426,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         mlflow.log_param("predictions_file", str(path))
         stored = store_results(engine, run_id, EXPERIMENT, results)
     if args.folds is None and args.horizons is None:
-        figure = FIGURES / "e2_low_data.png"
-        plot_low_data(results, figure)
-        section = render_section(run_id, e1_run, e3_run, folds, results, low_info)
-        replace_section(REPORTS / "experiments.md", EXPERIMENT, section)
+        write_report(run_id, e1_run, e3_run, folds, results, low_info)
     log.info("e2_done", run_id=run_id, rows=len(merged), results_rows=stored)
 
 

@@ -141,7 +141,7 @@ def test_render_section_and_chart(tmp_path: Path) -> None:
     when = datetime(2026, 5, 6, tzinfo=UTC)
     low = [LowData(1, 60, 4, 1, 100, 200), LowData(2, 60, 4, 1, 120, 210)]
     text = render_section("run", "e1", "e3", [Fold(1, when, when, when)] * 2, results, low)
-    assert "at most 120 training rows; the other stations have at least 200" in text
+    assert "differ by 90-100 training rows (cut-offs 100-120 rows)" in text
     assert "| +60 | lgbm_per_station | 1.000 (0/2) | 1.000 (0/2) | 1.000 (0/2) |" in text
     assert "| +60 | data_amount | low | 0.500 | +0.500 | +1.000 | +1.500 |" in text
     plot_low_data(results, tmp_path / "e2.png")
