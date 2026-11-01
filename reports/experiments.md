@@ -515,3 +515,56 @@ Calibration by slice, mean over folds:
 | +120 | capacity_band 30-39 | 0.797 | 6.47 | 0.103 | 0.100 | 0.499 | 0.478 | 0.448 | 1.033 | 0.500 |
 | +120 | capacity_band 40+ | 0.797 | 6.82 | 0.100 | 0.103 | 0.498 | 0.481 | 0.472 | 1.086 | 0.553 |
 | +120 | capacity_band <20 | 0.803 | 4.54 | 0.097 | 0.100 | 0.483 | 0.501 | 0.351 | 0.736 | 0.300 |
+
+## E7 — Feature-group ablation (+60, oracle weather)
+
+MLflow run `abd37ee684b04b2ab419e4775f4ec512` · git `f98717d` · generated 2026-11-01 10:26 UTC · data 2026-05-05 23:45 → 2026-06-30 23:45 UTC
+
+`lgbm_full` = `lgbm_global` with every feature group: the v1 groups, spatial (E4, 600 m), the in-fold E3 cluster as one-hot (E3 run `9f7a9d468a8a422b82b98fb0d2a64ffa`) and **oracle weather** (observed Dublin Airport weather in the hour containing the target bucket: not available at prediction time, so its effect is an upper bound). Each `lgbm_no_<group>` is retrained without one group, with the same folds, LightGBM defaults and early stopping. +60 only, all 8 folds (owner decision 2026-10-31). Forecast weather does not exist for these test weeks; the forecast-vs-oracle gap is deferred to collector data. Groups: `lags` (16); `rolling` (6); `seasonal` (2); `calendar` (13); `station_static` (4); `spatial` (5); `cluster` (4); `weather` (4).
+
+| model | MAE | ± | MASE | bias | coverage P10-P90 | width | rows |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| lgbm_no_station_static | 1.447 | 0.061 | 0.840 | -0.039 | 0.814 | 4.63 | 605888 |
+| lgbm_no_rolling | 1.451 | 0.062 | 0.843 | -0.040 | 0.812 | 4.59 | 605888 |
+| lgbm_no_cluster | 1.453 | 0.062 | 0.844 | -0.036 | 0.810 | 4.56 | 605888 |
+| lgbm_full | 1.454 | 0.061 | 0.844 | -0.036 | 0.811 | 4.56 | 605888 |
+| lgbm_no_weather | 1.454 | 0.062 | 0.844 | -0.036 | 0.812 | 4.59 | 605888 |
+| lgbm_no_spatial | 1.460 | 0.062 | 0.848 | -0.041 | 0.812 | 4.58 | 605888 |
+| lgbm_no_seasonal | 1.461 | 0.063 | 0.849 | -0.038 | 0.813 | 4.60 | 605888 |
+| lgbm_no_calendar | 1.519 | 0.065 | 0.882 | -0.035 | 0.808 | 4.74 | 605888 |
+| lgbm_no_lags | 1.562 | 0.059 | 0.908 | -0.038 | 0.800 | 4.79 | 605888 |
+| persistence | 1.722 | 0.086 | 1.000 | +0.001 | — | — | 605888 |
+
+Removing one group (ΔMAE = `lgbm_no_<group>` - `lgbm_full`, bikes; positive = the group helps):
+
+| group removed | ΔMAE mean | fold range | folds worse without it | Δcoverage |
+|---|---:|---:|---:|---:|
+| lags | +0.109 | +0.099 to +0.140 | 8/8 | -0.010 |
+| calendar | +0.065 | +0.057 to +0.071 | 8/8 | -0.002 |
+| seasonal | +0.007 | -0.002 to +0.013 | 7/8 | +0.002 |
+| spatial | +0.007 | +0.001 to +0.010 | 8/8 | +0.002 |
+| weather (oracle) | +0.000 | -0.004 to +0.002 | 6/8 | +0.001 |
+| cluster | -0.001 | -0.004 to +0.002 | 2/8 | -0.000 |
+| rolling | -0.003 | -0.006 to -0.001 | 0/8 | +0.002 |
+| station_static | -0.007 | -0.009 to -0.004 | 0/8 | +0.003 |
+
+![ΔMAE when each feature group is removed](figures/e7_ablation.png)
+
+ΔMAE by slice, mean over folds (columns: group removed):
+
+| slice | value | MAE full | lags | calendar | seasonal | spatial | weather | cluster | rolling | station_static |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| rush_hour | other | 1.197 | +0.112 | +0.028 | +0.001 | +0.004 | -0.000 | -0.001 | -0.002 | -0.002 |
+| rush_hour | rush | 2.220 | +0.098 | +0.177 | +0.028 | +0.015 | +0.001 | -0.001 | -0.006 | -0.022 |
+| weekend | weekday | 1.587 | +0.114 | +0.081 | +0.011 | +0.008 | +0.000 | -0.001 | -0.003 | -0.009 |
+| weekend | weekend | 1.124 | +0.097 | +0.027 | -0.001 | +0.003 | +0.000 | +0.000 | -0.003 | -0.001 |
+| capacity_band | 20-29 | 1.374 | +0.097 | +0.038 | +0.004 | +0.006 | -0.000 | -0.001 | -0.003 | -0.003 |
+| capacity_band | 30-39 | 1.449 | +0.113 | +0.071 | +0.006 | +0.006 | +0.001 | +0.000 | -0.002 | -0.007 |
+| capacity_band | 40+ | 1.530 | +0.114 | +0.080 | +0.012 | +0.008 | -0.000 | -0.001 | -0.003 | -0.009 |
+| capacity_band | <20 | 1.117 | +0.073 | +0.039 | -0.002 | +0.004 | -0.005 | -0.003 | -0.003 | -0.003 |
+| rebalance | flagged | 11.244 | -0.259 | +0.318 | +0.141 | +0.050 | +0.001 | -0.012 | -0.009 | -0.062 |
+| rebalance | normal | 1.387 | +0.111 | +0.064 | +0.007 | +0.006 | +0.000 | -0.001 | -0.003 | -0.006 |
+| cluster | 0 | 1.182 | +0.087 | +0.062 | +0.008 | +0.004 | -0.001 | -0.001 | -0.004 | -0.010 |
+| cluster | 1 | 1.561 | +0.119 | +0.074 | +0.006 | +0.008 | +0.001 | +0.000 | -0.001 | -0.003 |
+| cluster | 2 | 1.650 | +0.134 | +0.070 | +0.003 | +0.008 | -0.001 | -0.002 | -0.001 | -0.009 |
+| cluster | 3 | 1.745 | +0.123 | +0.059 | +0.011 | +0.008 | +0.002 | -0.000 | -0.003 | -0.003 |

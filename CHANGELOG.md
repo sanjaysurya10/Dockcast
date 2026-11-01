@@ -1,5 +1,32 @@
 # Changelog
 
+## M11 — Uncertainty study (E6) and feature-group ablation (E7) (2026-11-01)
+
+- Owner decisions (2026-10-31, PRD §23): M10 is deferred until there are at least 12 weeks of
+  collector data; E7 uses **oracle weather** only, at +60, on all 8 folds. The
+  forecast-vs-oracle weather gap is deferred to collector data, with M10.
+- E6 (`make backtest E=E6`), MLflow run `9f9688d815da4c4298891cfdd044219f` (code at `de916bc`):
+  calibration of the `lgbm_global` P10-P90 interval from E1 run
+  `e4819616d7034b90abcb3adc882313da`, with no retraining. Coverage is 0.825 / 0.814 / 0.797
+  at +30 / +60 / +120, width 3.10 / 4.59 / 6.44 bikes; tails (strict, because targets are whole
+  bikes) are y < P10 0.085 / 0.092 / 0.101 and y > P90 0.090 / 0.095 / 0.102. All 115 stations
+  are inside 0.70-0.90 at every horizon. Coverage is below 0.80 around 05-09 local time and
+  above it at night (01-04).
+- E7 (`make backtest E=E7`), MLflow run `abd37ee684b04b2ab419e4775f4ec512` (code at `4653479`,
+  about 12.5 h): `lgbm_full` (every v1 group plus spatial at 600 m, the in-fold E3 cluster
+  one-hot and **oracle weather**) against one model per removed group. MAE at +60: `lgbm_full`
+  1.454, persistence 1.722. ΔMAE when a group is removed (bikes, positive = the group helps):
+  lags +0.109 (8/8 folds), calendar +0.065 (8/8), seasonal +0.007 (7/8), spatial +0.007 (8/8),
+  weather (oracle) +0.000 (6/8), cluster -0.001 (2/8), rolling -0.003 (0/8), station_static
+  -0.007 (0/8). Even observed weather adds nothing measurable at +60 in these May-June test
+  weeks. Removing rolling or station_static slightly improves MAE in every fold.
+- New code: `dockcast/experiments/e6.py`, `dockcast/experiments/e7.py`,
+  `dockcast/features/weather.py` (oracle weather, ceil-hour join on Met Éireann `ts`).
+- Outputs: `reports/experiments.md` (E6, E7), `reports/figures/e6_coverage_by_hour.png`,
+  `reports/figures/e7_ablation.png`.
+- Tests: `tests/unit/test_e6.py`, `tests/unit/test_e7.py`,
+  `tests/leakage/test_weather_oracle.py`.
+
 ## M9 — Global vs per-station vs per-cluster, and Prophet, E2 (2026-10-31)
 
 - Models:
