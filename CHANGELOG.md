@@ -1,6 +1,6 @@
 # Changelog
 
-## M12 — Full error analysis (2026-11-01, v2 release tag pending owner decision)
+## M12 — Full error analysis and v2.0.0 (2026-11-01)
 
 - `make error-analysis` now joins E2 run `470f72791f044cd39a6a9afd2a061cfd` onto E1 run
   `e4819616d7034b90abcb3adc882313da` (same rows; it fails if E2's `lgbm_global` differs from
@@ -13,8 +13,10 @@
     lower coverage; the worst coverage is 05-09 local (per-cluster 0.716 at 05:00), and
     rebalance-flagged targets have MAE 11.3 and coverage 0.29.
   - §8, the PRD 12.5 champion rule on fold means: `lgbm_global` at +30 and +120 (per-cluster
-    is within 1 %), `lgbm_per_cluster` at +60 (MAE 1.445 vs 1.461, coverage 0.798). Serving
-    is unchanged (`lgbm_global`) until the owner decides.
+    is within 1 %), `lgbm_per_cluster` at +60 (MAE 1.445 vs 1.461, coverage 0.798).
+- Owner decisions (PRD §23): serving stays on `lgbm_global` at every horizon. `v2.0.0` is tagged
+  without M10, and E5 follows as v2.1.
+- README: status v2, a v2 experiments summary with run IDs, and updated limitations.
 - Tests: `tests/unit/test_error_analysis.py` (E2 join and mismatch checks, slice metrics,
   champion rule, slice order).
 

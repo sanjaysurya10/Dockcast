@@ -3,7 +3,8 @@
 Station-level bike availability forecasting for Dublin Bikes: bikes at +30/+60/+120 min with a
 P10-P90 range, and an honest account of where the model is wrong.
 
-Status: **v1** (PRD 17, M0-M6). A live collector and a 15-min forecast job run in the cloud; the
+Status: **v2** (PRD 17, M0-M9 and M11-M12; M10 event classifiers wait for 12 weeks of collector
+data and ship as v2.1). A live collector and a 15-min forecast job run in the cloud; the
 API runs locally (`make serve`). Every number below is copied from a generated report and carries
 its MLflow run ID; nothing is hand-typed.
 
@@ -34,12 +35,44 @@ against 1.203 off-peak; rebalancing-flagged rows have +60 MAE 11.307.
 Production model: bundle `lgbm-q-2026-06-30-3c421b6`, MLflow run
 `5c34442ebc3a4b46aca09893377ab030`, trained on all Format B history to 2026-06-30.
 
+## v2 experiments
+
+Same folds and test weeks as E1. Full tables are in `reports/experiments.md` and
+`reports/error_analysis.md`; the MAE values below are in bikes.
+
+- **E3 station groups**, run `9f7a9d468a8a422b82b98fb0d2a64ffa`: k-means with k = 4 on weekday
+  and weekend occupancy profiles. The groups are stable across folds (adjusted Rand index 0.992)
+  but only partly match between the 2021-24 and 2024-26 data (0.530).
+- **E4 spatial features**, run `a972985884564e83aa5b120428bd5c74`: neighbours within 600 m
+  improve MAE slightly. At +60 it is 1.456 vs 1.461, better in 7/8 folds.
+- **E2 global vs per-station vs per-cluster**, run `470f72791f044cd39a6a9afd2a061cfd`:
+  - one model per cluster: 0.987 / 1.445 / 2.028 at +30 / +60 / +120, vs global 0.995 / 1.461 /
+    2.047, but with lower coverage;
+  - one model per station is worse than global everywhere;
+  - Prophet (5.44) is worse than persistence.
+- **E2b low-data stations**, run `01131c8fc80b40b0abad2742db60f700`: with only 28 days of
+  history, the global model still reaches 1.476 at +60. Per-station falls to 2.108.
+- **E6 interval quality**, run `9f9688d815da4c4298891cfdd044219f`:
+  - P10-P90 coverage is 0.825 / 0.814 / 0.797 and every station is within 0.70-0.90;
+  - the range is too narrow around 05-09 local and too wide at night.
+- **E7 ablation at +60**, run `abd37ee684b04b2ab419e4775f4ec512`:
+  - removing lags costs +0.109 and calendar +0.065;
+  - spatial and seasonal add +0.007 each;
+  - **oracle** weather adds +0.000. This is observed weather at the target time, so it is an
+    upper bound: even perfect weather does not help at +60 in these May-June weeks.
+  - Dropping rolling or station_static slightly improves MAE.
+- **Champion**: the PRD 12.5 rule picks per-cluster at +60, with a 1.1 % gain. The owner kept
+  `lgbm_global` at every horizon (PRD 23) because of lower coverage and the extra serving
+  pipeline it would need.
+
 ## Limitations
 
-- **No weather.** Weather is collected but not yet a model feature; the backtest is weather-free.
+- **No weather in the served model.** Weather is collected but is not a model feature. E7 found
+  that even oracle weather adds nothing measurable at +60; forecast weather has not been tested.
+- **No event classifiers yet** (E5, M10). These need 12 weeks of collector data.
 - **S1 is borderline** (0.002 bikes margin, well inside one fold std).
 - **Untuned.** 51 of 72 LightGBM boosters used all 2000 rounds without early stopping
-  (PRD 12.3 defaults); tuning is a v2 task.
+  (PRD 12.3 defaults); v2 did not tune either.
 - **Weekend +30:** LightGBM MAE 0.750 vs persistence 0.732 — slightly worse than "no change".
 - **Rebalancing** is not observed directly; van moves show up as large errors (flagged rows).
 - **Training/live gap.** Training data ends 2026-06-30; the live collector started 2026-10-22, so
