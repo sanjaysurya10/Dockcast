@@ -73,6 +73,18 @@ export function useCityRisk(
   });
 }
 
+/** Net change in bikes over the last `window` minutes (PRD 10.6); fetched only while shown. */
+export function useNetFlow(enabled: boolean, window = 60, city: string = CITY) {
+  return useQuery({
+    queryKey: ["netflow", city, window],
+    queryFn: ({ signal }) =>
+      apiGet("/v1/cities/{city}/netflow", { path: { city }, query: { window }, signal }),
+    refetchInterval: MINUTE,
+    enabled,
+    retry: false,
+  });
+}
+
 export function useStationHistory(stationKey: number, hours: number) {
   return useQuery({
     queryKey: ["history", stationKey, hours],

@@ -99,6 +99,8 @@ export async function apiGet<P extends GetPath>(
 }
 
 export type CityRisk = components["schemas"]["CityRisk"];
+export type CityNetFlow = components["schemas"]["CityNetFlow"];
+export type NetFlowStation = components["schemas"]["NetFlowStation"];
 export type RiskStation = components["schemas"]["RiskStation"];
 export type StationHistory = components["schemas"]["StationHistory"];
 export type StationAlternatives = components["schemas"]["StationAlternatives"];

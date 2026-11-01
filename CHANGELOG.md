@@ -1,5 +1,34 @@
 # Changelog
 
+## M16 — Net flow, autopilot and mobile (2026-11-01)
+
+- **API**: `GET /v1/cities/{city}/netflow?window=60` (15–120, multiples of 15). It gives the net
+  change in bikes per station over the window, from `station_status_15m`. Stations are
+  excluded when the window holds a rebalance-flagged or closed bucket, or when an end is
+  missing. It returns 503 when the data is stale. This is net change, not trips.
+- **Net flow layer** (PRD 16.3 item 8): a "Net flow" toggle draws deck.gl rings under the
+  stations. Inflow pulses outward in the brand colour, outflow pulses inward in muted ink, and
+  size grows with |net|. The legend counts inflow, outflow, unchanged and excluded stations and
+  says the rings are net change, not trips. With reduced motion the rings are still.
+- **Autopilot** (PRD 16.3 item 7): tours up to 10 stations with empty or full risk. Each stop
+  flies in (zoom 16, pitch 45°, 2 s) and holds 4 s with the station panel open, then the tour
+  wraps. Any pointer, wheel, touch or key input stops it. With reduced motion it jumps and
+  holds. Progress is announced through `aria-live`.
+- **Mobile** (PRD 16.6):
+  - the map fills the screen, and stations sit in a bottom sheet that peeks or opens;
+  - bottom nav: Nearby · Map · Accuracy, with ≥ 44 px targets;
+  - map legends sit behind a "Map key" toggle.
+- **Nearby page** (`/nearby`): "Use my location" asks for geolocation only after the tap and
+  lists the 5 nearest stations with approximate walk distance and their current state. The
+  location never leaves the browser.
+- **Tests**:
+  - API net flow test, including rebalance exclusion;
+  - Vitest for net flow, autopilot stops, the autopilot timer and input stop, and nearby sort;
+  - Playwright: net flow toggle, autopilot start/stop, reduced-motion autopilot, Nearby with
+    mocked geolocation, phone bottom nav and sheet.
+  - The net flow fixture is the hosted 11:15–12:15 UTC window on 2026-11-01. Station 5 there is
+    rebalance-excluded (its 4 → 21 jump).
+
 ## M15 — Station detail and model pages (2026-11-01)
 
 - **API**:

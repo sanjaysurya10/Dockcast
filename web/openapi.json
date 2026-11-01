@@ -264,6 +264,39 @@
         "title": "City",
         "type": "object"
       },
+      "CityNetFlow": {
+        "description": "``GET /v1/cities/{city}/netflow`` (PRD 10.6): net change, not separate trips.",
+        "properties": {
+          "city": {
+            "title": "City",
+            "type": "string"
+          },
+          "stations": {
+            "items": {
+              "$ref": "#/components/schemas/NetFlowStation"
+            },
+            "title": "Stations",
+            "type": "array"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "window_min": {
+            "title": "Window Min",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "city",
+          "window_min",
+          "ts",
+          "stations"
+        ],
+        "title": "CityNetFlow",
+        "type": "object"
+      },
       "CityRisk": {
         "description": "``GET /v1/cities/{city}/risk``: stations ranked by empty or full risk at one window.\n\n``basis`` is ``forecast_range``: levels come from the regression P10/P50/P90, not from\ncalibrated event probabilities (those arrive with M10).",
         "properties": {
@@ -751,6 +784,49 @@
         "title": "ModelSummary",
         "type": "object"
       },
+      "NetFlowStation": {
+        "description": "One station's net change in bikes over the window; null when excluded.",
+        "properties": {
+          "excluded": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rebalance",
+                  "closed",
+                  "missing"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded"
+          },
+          "net_flow": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Flow"
+          },
+          "station_key": {
+            "title": "Station Key",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station_key",
+          "net_flow",
+          "excluded"
+        ],
+        "title": "NetFlowStation",
+        "type": "object"
+      },
       "Risk": {
         "description": "P(empty) / P(full) in the next window (event models arrive in v2, M10).",
         "properties": {
@@ -1232,6 +1308,59 @@
           }
         },
         "summary": "List Cities"
+      }
+    },
+    "/v1/cities/{city}/netflow": {
+      "get": {
+        "description": "Net change in bikes per station over ``window`` minutes (PRD 10.6), not trips.",
+        "operationId": "city_net_flow_v1_cities__city__netflow_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "city",
+            "required": true,
+            "schema": {
+              "title": "City",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "maximum": 120,
+              "minimum": 15,
+              "multipleOf": 15,
+              "title": "Window",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CityNetFlow"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "City Net Flow"
       }
     },
     "/v1/cities/{city}/risk": {

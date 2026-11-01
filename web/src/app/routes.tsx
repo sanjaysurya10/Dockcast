@@ -4,6 +4,7 @@ import { Outlet, type RouteObject } from "react-router";
 import { Loading } from "@/components/QueryState";
 import { AboutPage } from "@/pages/AboutPage";
 import { MapPage } from "@/pages/MapPage";
+import { NearbyPage } from "@/pages/NearbyPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 import { Layout } from "./Layout";
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
         children: [
           { path: "station/:stationKey", element: <StationPage /> },
           { path: "model", element: <ModelPage /> },
+          { path: "nearby", element: <NearbyPage /> },
           { path: "about", element: <AboutPage /> },
           { path: "*", element: <NotFoundPage /> },
         ],

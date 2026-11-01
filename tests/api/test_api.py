@@ -180,6 +180,44 @@ def test_history_alternatives_and_drivers(seeded: tuple[TestClient, dict[str, in
     assert missing == "station_not_found"
 
 
+def test_net_flow_is_the_change_over_the_window_without_rebalancing(
+    seeded: tuple[TestClient, dict[str, int]], db_engine: Engine
+) -> None:
+    client, keys = seeded
+    body = client.get("/v1/cities/dublin/netflow?window=60").json()
+    assert body["window_min"] == 60 and {s["station_key"] for s in body["stations"]} == set(
+        keys.values()
+    )
+    end = datetime.fromisoformat(body["ts"])
+    with db_engine.connect() as conn:
+        bikes = dict(
+            conn.execute(
+                text(
+                    "SELECT ts, bikes_last FROM station_status_15m WHERE station_key = :k "
+                    "AND ts IN (:end, :start)"
+                ),
+                {"k": keys["A"], "end": end, "start": end - timedelta(minutes=60)},
+            ).all()
+        )
+    expected = bikes[end] - bikes[end - timedelta(minutes=60)]
+    station_a = next(s for s in body["stations"] if s["station_key"] == keys["A"])
+    assert station_a["excluded"] is None and station_a["net_flow"] == pytest.approx(expected)
+
+    with db_engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE station_status_15m SET rebalance_flag = true "
+                "WHERE station_key = :k AND ts = :t"
+            ),
+            {"k": keys["A"], "t": end - timedelta(minutes=15)},
+        )
+    flagged = client.get("/v1/cities/dublin/netflow").json()["stations"]
+    station_a = next(s for s in flagged if s["station_key"] == keys["A"])
+    assert station_a == {"station_key": keys["A"], "net_flow": None, "excluded": "rebalance"}
+    assert client.get("/v1/cities/dublin/netflow?window=20").status_code == 422
+    assert client.get("/v1/cities/paris/netflow").json()["error"]["code"] == "city_not_found"
+
+
 def test_drivers_keep_only_the_latest_issue(
     seeded: tuple[TestClient, dict[str, int]], db_engine: Engine
 ) -> None:

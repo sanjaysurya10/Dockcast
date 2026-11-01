@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cities/{city}/netflow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * City Net Flow
+         * @description Net change in bikes per station over ``window`` minutes (PRD 10.6), not trips.
+         */
+        get: operations["city_net_flow_v1_cities__city__netflow_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cities/{city}/risk": {
         parameters: {
             query?: never;
@@ -355,6 +375,23 @@ export interface components {
             timezone: string;
         };
         /**
+         * CityNetFlow
+         * @description ``GET /v1/cities/{city}/netflow`` (PRD 10.6): net change, not separate trips.
+         */
+        CityNetFlow: {
+            /** City */
+            city: string;
+            /** Stations */
+            stations: components["schemas"]["NetFlowStation"][];
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Window Min */
+            window_min: number;
+        };
+        /**
          * CityRisk
          * @description ``GET /v1/cities/{city}/risk``: stations ranked by empty or full risk at one window.
          *
@@ -563,6 +600,18 @@ export interface components {
             data_health: components["schemas"]["DataHealth"];
             /** Last Retrain */
             last_retrain: string | null;
+        };
+        /**
+         * NetFlowStation
+         * @description One station's net change in bikes over the window; null when excluded.
+         */
+        NetFlowStation: {
+            /** Excluded */
+            excluded: ("rebalance" | "closed" | "missing") | null;
+            /** Net Flow */
+            net_flow: number | null;
+            /** Station Key */
+            station_key: number;
         };
         /**
          * Risk
@@ -782,6 +831,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["City"][];
+                };
+            };
+        };
+    };
+    city_net_flow_v1_cities__city__netflow_get: {
+        parameters: {
+            query?: {
+                window?: number;
+            };
+            header?: never;
+            path: {
+                city: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CityNetFlow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

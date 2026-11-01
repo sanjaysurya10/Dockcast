@@ -11,11 +11,13 @@ from dockcast.api.errors import ApiError, stale, station_not_found
 from dockcast.api.schemas import (
     Alternative,
     City,
+    CityNetFlow,
     CityRisk,
     Driver,
     Freshness,
     HistoryPoint,
     HorizonForecast,
+    NetFlowStation,
     RiskStation,
     Station,
     StationAlternatives,
@@ -126,6 +128,45 @@ def city_risk(
         total=len(ranked),
         stations=[item for _, item in ranked[offset : offset + limit]],
     )
+
+
+@router.get("/cities/{city}/netflow", response_model=CityNetFlow)
+def city_net_flow(
+    city: str,
+    request: Request,
+    response: Response,
+    window: Annotated[int, Query(ge=15, le=120, multiple_of=15)] = 60,
+) -> CityNetFlow:
+    """Net change in bikes per station over ``window`` minutes (PRD 10.6), not trips."""
+    with _engine(request).connect() as conn:
+        if city not in {c["city_code"] for c in queries.cities(conn)}:
+            raise ApiError(404, "city_not_found", f"no city {city!r}")
+        end_ts = queries.latest_bucket(conn, city)
+        if end_ts is None:
+            raise ApiError(404, "netflow_not_found", f"no 15-min states for city {city!r}")
+        limit_s = timedelta(minutes=load_project_config().serving.stale_after_min).total_seconds()
+        if (datetime.now(UTC) - end_ts).total_seconds() > limit_s:
+            raise stale(f"15-min states for {city!r} are older than {limit_s / 60:g} min")
+        rows = queries.net_flow(conn, city, end_ts, window)
+    _cache(response, 60)
+    return CityNetFlow(
+        city=city,
+        window_min=window,
+        ts=end_ts,
+        stations=[_net_flow_station(row) for row in rows],
+    )
+
+
+def _net_flow_station(row: dict[str, Any]) -> NetFlowStation:
+    excluded: Literal["rebalance", "closed", "missing"] | None = None
+    if row["bikes_end"] is None or row["bikes_start"] is None:
+        excluded = "missing"
+    elif row["closed"]:
+        excluded = "closed"
+    elif row["rebalanced"]:
+        excluded = "rebalance"
+    net = None if excluded else float(row["bikes_end"]) - float(row["bikes_start"])
+    return NetFlowStation(station_key=row["station_key"], net_flow=net, excluded=excluded)
 
 
 @router.get("/stations/{station_key}", response_model=Station)

@@ -1,6 +1,7 @@
 import type {
   Backtest,
   City,
+  CityNetFlow,
   CityRisk,
   ErrorAnalysis,
   Health,
@@ -216,6 +217,23 @@ export const HISTORY_5: StationHistory = {
   })),
 };
 
+/**
+ * Hosted `station_status_15m`, 11:15 -> 12:15 UTC on 2026-11-01. Station 5 jumped 4 -> 21 at
+ * 11:15 and is rebalance-flagged inside the window, so it is excluded.
+ */
+export const NET_FLOW: CityNetFlow = {
+  city: "dublin",
+  window_min: 60,
+  ts: "2026-11-01T12:15:00Z",
+  stations: [
+    { station_key: 5, net_flow: null, excluded: "rebalance" },
+    { station_key: 14, net_flow: 3, excluded: null },
+    { station_key: 15, net_flow: 0, excluded: null },
+    { station_key: 33, net_flow: -3, excluded: null },
+    { station_key: 68, net_flow: 1, excluded: null },
+  ],
+};
+
 function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const rad = Math.PI / 180;
   const a =
@@ -345,6 +363,7 @@ export function mockResponse(url: string, now: Date = new Date()): { status: num
     return { status: 200, body };
   }
   if (path === "/v1/cities/dublin/stations") return { status: 200, body: STATIONS };
+  if (path === "/v1/cities/dublin/netflow") return { status: 200, body: NET_FLOW };
   if (path === "/v1/stations/5/forecast") return { status: 200, body: FORECAST_5 };
   if (path === "/v1/model/summary") return { status: 200, body: MODEL_SUMMARY };
   if (path === "/v1/stations/5/history") return { status: 200, body: HISTORY_5 };

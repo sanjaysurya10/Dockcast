@@ -5,15 +5,19 @@ import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { LABEL_ZOOM, MAP_STYLE_DARK, MAP_STYLE_LIGHT, STATION_ZOOM } from "@/lib/config";
+import type { NetFlowPoint } from "@/lib/netflow";
 import type { MapStation } from "@/lib/risk";
 import { tokenRgb } from "@/lib/tokens";
 
+import { type FlowColours, netFlowLayer } from "./NetFlowLayer";
 import { resolveColours, stationLayers } from "./StationLayer";
 
 export interface MapFocus {
   lat: number;
   lon: number;
   zoom: number;
+  pitch?: number;
+  durationMs?: number;
 }
 
 export interface GlobeMapProps {
@@ -25,7 +29,11 @@ export interface GlobeMapProps {
   onSelect: (stationKey: number) => void;
   reducedMotion: boolean;
   dark: boolean;
+  netFlow: NetFlowPoint[] | null;
 }
+
+const PULSE_MS = 2000;
+const PULSE_FRAME_MS = 33;
 
 const WORLD = { center: [-20, 35] as [number, number], zoom: 1.2 };
 const SPIN_DEG_PER_S = 3;
@@ -45,7 +53,8 @@ function detailAt(zoom: number): Detail {
  * from zoom 9 deck.gl station circles, from zoom 15 station names.
  */
 export default function GlobeMap(props: GlobeMapProps) {
-  const { centre, cityName, stations, selectedKey, focus, onSelect, reducedMotion, dark } = props;
+  const { centre, cityName, stations, selectedKey, focus, onSelect, reducedMotion, dark, netFlow } =
+    props;
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
@@ -154,9 +163,13 @@ export default function GlobeMap(props: GlobeMapProps) {
     const map = mapRef.current;
     if (!map || !focus) return;
     introDone.current = true;
-    const target = { center: [focus.lon, focus.lat] as [number, number], zoom: focus.zoom };
+    const target = {
+      center: [focus.lon, focus.lat] as [number, number],
+      zoom: focus.zoom,
+      pitch: focus.pitch ?? 0,
+    };
     if (reducedMotion) map.jumpTo(target);
-    else map.flyTo({ ...target, duration: 1500 });
+    else map.flyTo({ ...target, duration: focus.durationMs ?? 1500 });
   }, [focus, reducedMotion]);
 
   // The station layer only rebuilds when its inputs change (PRD 16.8).
@@ -179,9 +192,38 @@ export default function GlobeMap(props: GlobeMapProps) {
           }),
     [detail, stations, selectedKey, colours, ink, onSelect],
   );
+  const flowColours = useMemo(
+    (): FlowColours => ({ inflow: tokenRgb("--brand"), outflow: tokenRgb("--muted") }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dark],
+  );
+
+  // Net flow rings sit under the stations; they pulse unless reduced motion is requested.
   useEffect(() => {
-    overlayRef.current?.setProps({ layers });
-  }, [layers]);
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const points = detail === "city" ? null : netFlow;
+    if (!points) {
+      overlay.setProps({ layers });
+      return;
+    }
+    if (reducedMotion) {
+      overlay.setProps({ layers: [netFlowLayer(points, flowColours, null), ...layers] });
+      return;
+    }
+    let frame = 0;
+    let drawn = 0;
+    const draw = (now: number) => {
+      if (now - drawn >= PULSE_FRAME_MS) {
+        drawn = now;
+        const phase = (now % PULSE_MS) / PULSE_MS;
+        overlay.setProps({ layers: [netFlowLayer(points, flowColours, phase), ...layers] });
+      }
+      frame = requestAnimationFrame(draw);
+    };
+    frame = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frame);
+  }, [layers, netFlow, detail, reducedMotion, flowColours]);
 
   return (
     // MapLibre sets `position: relative` on its container, so the sizing lives on a wrapper.
@@ -190,6 +232,7 @@ export default function GlobeMap(props: GlobeMapProps) {
       role="region"
       aria-label={`Map of ${cityName} stations. Use the station list for keyboard access.`}
       data-detail={detail}
+      data-net-flow={netFlow ? netFlow.length : undefined}
     >
       <div ref={container} className="h-full w-full" />
     </div>

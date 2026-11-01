@@ -1,6 +1,6 @@
 """SQL behind the API. Every list query is bounded by station count or ``limit``."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -141,6 +141,46 @@ def history(conn: Connection, station_key: int, hours: int) -> list[dict[str, An
         }
         for r in rows
     ]
+
+
+LATEST_BUCKET = text(
+    """
+    SELECT max(b.ts) FROM station_status_15m b
+    JOIN stations s USING (station_key)
+    WHERE s.city_code = :city
+    """
+)
+
+NET_FLOW = text(
+    """
+    SELECT s.station_key,
+           e.bikes_last AS bikes_end,
+           st.bikes_last AS bikes_start,
+           COALESCE(bool_or(w.rebalance_flag), false) AS rebalanced,
+           COALESCE(bool_or(w.is_closed), false) AS closed
+    FROM stations s
+    LEFT JOIN station_status_15m e ON e.station_key = s.station_key AND e.ts = :end_ts
+    LEFT JOIN station_status_15m st ON st.station_key = s.station_key AND st.ts = :start_ts
+    LEFT JOIN station_status_15m w ON w.station_key = s.station_key
+         AND w.ts > :start_ts AND w.ts <= :end_ts
+    WHERE s.city_code = :city
+    GROUP BY s.station_key, e.bikes_last, st.bikes_last
+    ORDER BY s.station_key
+    """
+)
+
+
+def latest_bucket(conn: Connection, city: str) -> datetime | None:
+    """The city's newest 15-min bucket."""
+    return _utc(conn.execute(LATEST_BUCKET, {"city": city}).scalar())
+
+
+def net_flow(
+    conn: Connection, city: str, end_ts: datetime, window_min: int
+) -> list[dict[str, Any]]:
+    """Bikes at ``end_ts`` minus ``window_min`` earlier, with rebalancing and closures flagged."""
+    params = {"city": city, "end_ts": end_ts, "start_ts": end_ts - timedelta(minutes=window_min)}
+    return [dict(r) for r in conn.execute(NET_FLOW, params).mappings()]
 
 
 DRIVERS = text(

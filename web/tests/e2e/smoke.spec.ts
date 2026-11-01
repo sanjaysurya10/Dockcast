@@ -101,3 +101,78 @@ test("model page draws its charts", async ({ page }) => {
   await expect(page.getByRole("img", { name: /115 stations/ })).toBeVisible();
   await expect(page.locator(".recharts-surface")).toHaveCount(2);
 });
+
+test.describe("map modes", () => {
+  test("net flow toggle draws rings and explains they are net change, not trips", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const toggle = page.getByRole("button", { name: "Net flow" });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const legend = page.getByTestId("net-flow-legend");
+    await expect(legend).toContainText("not trips");
+    await expect(legend).toContainText("Excluded (rebalancing, closed or no data)1");
+    await expect(page.locator("[data-net-flow]")).toHaveAttribute("data-net-flow", "3");
+    await toggle.click();
+    await expect(legend).toBeHidden();
+  });
+
+  test("autopilot tours at-risk stations and stops on user input", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Autopilot" }).click();
+    const status = page.getByTestId("autopilot-status");
+    await expect(status).toContainText(/station 1 of 3/);
+    await expect(page.getByRole("button", { name: "Stop autopilot" })).toBeVisible();
+    await expect(page.locator("#station-panel-heading")).toBeVisible();
+    await page.getByLabel("Search stations").press("a");
+    await expect(page.getByRole("button", { name: "Autopilot" })).toBeVisible();
+    await expect(status).toBeEmpty();
+  });
+});
+
+test.describe("reduced motion autopilot", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("jumps between stops, holding 4 s each", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Autopilot" }).click();
+    const status = page.getByTestId("autopilot-status");
+    await expect(status).toContainText(/station 1 of 3/);
+    await expect(status).toContainText(/station 2 of 3/, { timeout: 6_000 });
+  });
+});
+
+test.describe("nearby", () => {
+  test.use({
+    geolocation: { latitude: 53.3307, longitude: -6.26 },
+    permissions: ["geolocation"],
+  });
+
+  test("asks for location only after the tap, then lists the nearest stations", async ({
+    page,
+  }) => {
+    await page.goto("/nearby");
+    await expect(page.getByRole("list", { name: "Nearest stations" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Use my location" }).click();
+    const list = page.getByRole("list", { name: "Nearest stations" });
+    await expect(list.getByRole("link").first()).toContainText("CHARLEMONT PLACE");
+    await expect(list.getByRole("link")).toHaveCount(5);
+  });
+});
+
+test("phones get a bottom nav and a station sheet over the map", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "phone layout only");
+  await page.goto("/");
+  const sections = page.getByRole("navigation", { name: "Sections" });
+  await expect(sections.getByRole("link")).toHaveText(["Nearby", "Map", "Accuracy"]);
+  const sheet = page.getByRole("complementary", { name: "Stations" });
+  await expect(sheet).toHaveAttribute("data-expanded", "false");
+  await page.getByRole("button", { name: "Expand stations" }).click();
+  await expect(sheet).toHaveAttribute("data-expanded", "true");
+  for (const link of await sections.getByRole("link").all()) {
+    expect((await link.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+  await sections.getByRole("link", { name: "Nearby" }).click();
+  await expect(page.getByRole("heading", { name: "Nearby stations" })).toBeVisible();
+});

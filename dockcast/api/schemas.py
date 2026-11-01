@@ -141,6 +141,23 @@ class StationHistory(BaseModel):
     points: list[HistoryPoint]
 
 
+class NetFlowStation(BaseModel):
+    """One station's net change in bikes over the window; null when excluded."""
+
+    station_key: int
+    net_flow: float | None
+    excluded: Literal["rebalance", "closed", "missing"] | None
+
+
+class CityNetFlow(BaseModel):
+    """``GET /v1/cities/{city}/netflow`` (PRD 10.6): net change, not separate trips."""
+
+    city: str
+    window_min: int
+    ts: datetime
+    stations: list[NetFlowStation]
+
+
 class Alternative(BaseModel):
     """A nearby station with bikes forecast at the horizon."""
 
