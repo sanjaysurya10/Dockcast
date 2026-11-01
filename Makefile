@@ -1,4 +1,4 @@
-.PHONY: all setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest error-analysis train forecast serve results collect collector-up collector-down collector-logs health lint typecheck pytest test web web-api web-test web-e2e
+.PHONY: all setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest error-analysis publish-backtest train forecast serve results collect collector-up collector-down collector-logs health lint typecheck pytest test web web-api web-test web-e2e
 
 -include .env
 export
@@ -60,6 +60,10 @@ backtest:
 
 error-analysis:
 	uv run python -m dockcast.evaluation.error_analysis
+
+# Copy each experiment's default backtest run to the hosted DB; needs PUBLISH_DATABASE_URL.
+publish-backtest:
+	uv run python -m dockcast.evaluation.publish $(ARGS)
 
 train:
 	uv run python -m dockcast.serving.train

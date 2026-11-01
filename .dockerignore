@@ -11,5 +11,6 @@ data
 mlruns
 notebooks
 reports
+!reports/error_analysis.json
 tests
 web

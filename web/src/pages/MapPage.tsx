@@ -36,6 +36,8 @@ export function MapPage() {
   const [netFlowOn, setNetFlowOn] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [keyOpen, setKeyOpen] = useState(false);
+  const [basemapFailed, setBasemapFailed] = useState(false);
+  const handleBasemapFailed = useCallback(() => setBasemapFailed(true), []);
   const reducedMotion = useReducedMotion();
   const dark = useDarkMode();
   // "Now" colours need no forecast, but autopilot still tours the +60 risk ranking.
@@ -124,6 +126,7 @@ export function MapPage() {
               reducedMotion={reducedMotion}
               dark={dark}
               netFlow={netFlowOn && netFlow.data ? flow.points : null}
+              onBasemapFailed={handleBasemapFailed}
             />
           </Suspense>
         </MapErrorBoundary>
@@ -167,6 +170,14 @@ export function MapPage() {
           </div>
         </div>
         <div className="absolute bottom-40 left-3 flex w-60 flex-col-reverse md:bottom-10 md:flex-col">
+          {basemapFailed && (
+            <p
+              role="status"
+              className="mt-2 rounded-control border border-line bg-surface p-2 text-xs shadow-sm md:mb-2 md:mt-0"
+            >
+              Basemap unavailable; stations are shown on a plain background.
+            </p>
+          )}
           <button
             type="button"
             aria-expanded={keyOpen}

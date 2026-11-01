@@ -1,12 +1,15 @@
-"""Nightly archive of live raw rows to Parquet, then retention pruning (PRD 18.4).
+"""Nightly archive of hosted rows to Parquet, then retention pruning (PRD 18.4).
 
-Exports carry ``city_code`` and the GBFS ``source_id`` (not only ``station_key``) so they can be
-re-imported into a database whose station keys differ, e.g. the local research DB.
-Upload to object storage (R2) is done by the deployment script between ``export`` and ``prune``.
+Two tables are archived: live raw rows (by ``observed_at``) and forecasts (by ``issued_at``,
+owner decision 2026-11-01: 14 days hosted). Exports carry ``city_code`` and the GBFS
+``source_id`` (not only ``station_key``) so they can be re-imported into a database whose
+station keys differ, e.g. the local research DB. Upload to object storage (R2) is done by the
+deployment script between ``export`` and ``prune``.
 """
 
 import argparse
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
@@ -19,13 +22,39 @@ from dockcast.db.engine import make_engine
 
 log = structlog.get_logger(job="archive")
 
-EXPORT_SQL = text(
-    "SELECT s.city_code, s.source_id, r.station_key, r.observed_at, r.last_reported, "
-    "r.bikes_available, r.docks_available, r.is_renting, r.is_returning, r.source "
-    "FROM station_status_raw r JOIN stations s USING (station_key) "
-    "WHERE r.source = 'live' AND r.observed_at >= :start AND r.observed_at < :end "
-    "ORDER BY r.station_key, r.observed_at"
+
+@dataclass(frozen=True)
+class ArchiveTable:
+    """One archived table: its day column, row filter, export columns and Parquet folder."""
+
+    table: str
+    ts_column: str
+    where: str
+    columns: str
+    folder: str
+
+
+RAW = ArchiveTable(
+    table="station_status_raw",
+    ts_column="observed_at",
+    where="t.source = 'live'",
+    columns="t.station_key, t.observed_at, t.last_reported, t.bikes_available, "
+    "t.docks_available, t.is_renting, t.is_returning, t.source",
+    folder="station_status_raw/source=live",
 )
+
+FORECASTS = ArchiveTable(
+    table="forecasts",
+    ts_column="issued_at",
+    where="true",
+    columns="t.station_key, t.issued_at, t.horizon_min, t.target_ts, t.bikes_p10, "
+    "t.bikes_p50, t.bikes_p90, t.model_version",
+    folder="forecasts",
+)
+
+
+def _day_filter(spec: ArchiveTable) -> str:
+    return f"{spec.where} AND t.{spec.ts_column} >= :start AND t.{spec.ts_column} < :end"
 
 
 def day_bounds(day: date) -> tuple[datetime, datetime]:
@@ -55,89 +84,91 @@ def retention_cutoff(now: datetime, keep_days: int) -> datetime:
     return today - timedelta(days=keep_days)
 
 
-def days_before(engine: Engine, cutoff: datetime) -> list[date]:
-    """UTC dates that still hold live rows older than ``cutoff``.
+def days_before(engine: Engine, cutoff: datetime, spec: ArchiveTable = RAW) -> list[date]:
+    """UTC dates that still hold rows of ``spec`` older than ``cutoff``.
 
     Args:
         engine: Database engine.
         cutoff: Exclusive upper bound.
+        spec: Table to look at.
 
     Returns:
         Dates in ascending order.
     """
     query = text(
-        "SELECT DISTINCT (observed_at AT TIME ZONE 'UTC')::date FROM station_status_raw "
-        "WHERE source = 'live' AND observed_at < :cutoff ORDER BY 1"
+        f"SELECT DISTINCT (t.{spec.ts_column} AT TIME ZONE 'UTC')::date FROM {spec.table} t "
+        f"WHERE {spec.where} AND t.{spec.ts_column} < :cutoff ORDER BY 1"
     )
     with engine.connect() as conn:
         return [row[0] for row in conn.execute(query, {"cutoff": cutoff})]
 
 
-def archive_path(root: Path, day: date) -> Path:
-    """Hive-style path: ``<root>/station_status_raw/source=live/date=YYYY-MM-DD/part-0.parquet``.
+def archive_path(root: Path, day: date, spec: ArchiveTable = RAW) -> Path:
+    """Hive-style path: ``<root>/<folder>/date=YYYY-MM-DD/part-0.parquet``.
 
     Args:
         root: Archive root.
         day: UTC date.
+        spec: Archived table.
 
     Returns:
         Parquet file path.
     """
-    return root / "station_status_raw" / "source=live" / f"date={day:%Y-%m-%d}" / "part-0.parquet"
+    return root / spec.folder / f"date={day:%Y-%m-%d}" / "part-0.parquet"
 
 
-def export_day(engine: Engine, day: date, root: Path) -> int:
-    """Write one UTC day of live rows to Parquet (overwrites).
+def export_day(engine: Engine, day: date, root: Path, spec: ArchiveTable = RAW) -> int:
+    """Write one UTC day of ``spec`` rows to Parquet (overwrites).
 
     Args:
         engine: Database engine.
         day: UTC date.
         root: Archive root.
+        spec: Table to export.
 
     Returns:
         Number of rows written.
     """
     start, end = day_bounds(day)
+    query = text(
+        f"SELECT s.city_code, s.source_id, {spec.columns} "
+        f"FROM {spec.table} t JOIN stations s USING (station_key) "
+        f"WHERE {_day_filter(spec)} ORDER BY t.station_key, t.{spec.ts_column}"
+    )
     with engine.connect() as conn:
-        frame = pd.read_sql(EXPORT_SQL, conn, params={"start": start, "end": end})
-    path = archive_path(root, day)
+        frame = pd.read_sql(query, conn, params={"start": start, "end": end})
+    path = archive_path(root, day, spec)
     path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_parquet(path, index=False)
-    log.info("exported", day=str(day), rows=len(frame), path=str(path))
+    log.info("exported", table=spec.table, day=str(day), rows=len(frame), path=str(path))
     return len(frame)
 
 
-def prune_day(engine: Engine, day: date, root: Path) -> int:
-    """Delete one day of live rows, only if its Parquet file holds the same row count.
+def prune_day(engine: Engine, day: date, root: Path, spec: ArchiveTable = RAW) -> int:
+    """Delete one day of ``spec`` rows, only if its Parquet file holds the same row count.
 
     Args:
         engine: Database engine.
         day: UTC date.
         root: Archive root.
+        spec: Table to prune.
 
     Returns:
         Rows deleted (0 if the archive is missing or incomplete).
     """
-    path = archive_path(root, day)
-    start, end = day_bounds(day)
-    count_sql = text(
-        "SELECT count(*) FROM station_status_raw "
-        "WHERE source = 'live' AND observed_at >= :start AND observed_at < :end"
-    )
+    path = archive_path(root, day, spec)
+    params = dict(zip(("start", "end"), day_bounds(day), strict=True))
     with engine.begin() as conn:
-        in_db = int(conn.execute(count_sql, {"start": start, "end": end}).scalar_one())
+        count_sql = text(f"SELECT count(*) FROM {spec.table} t WHERE {_day_filter(spec)}")
+        in_db = int(conn.execute(count_sql, params).scalar_one())
         archived = len(pd.read_parquet(path, columns=["station_key"])) if path.exists() else -1
         if archived != in_db:
-            log.error("prune_refused", day=str(day), in_db=in_db, archived=archived)
+            log.error("prune_refused", table=spec.table, day=str(day), in_db=in_db,
+                      archived=archived)  # fmt: skip
             return 0
-        deleted = conn.execute(
-            text(
-                "DELETE FROM station_status_raw "
-                "WHERE source = 'live' AND observed_at >= :start AND observed_at < :end"
-            ),
-            {"start": start, "end": end},
-        ).rowcount
-    log.info("pruned", day=str(day), rows=deleted)
+        delete_sql = text(f"DELETE FROM {spec.table} t WHERE {_day_filter(spec)}")
+        deleted = conn.execute(delete_sql, params).rowcount
+    log.info("pruned", table=spec.table, day=str(day), rows=deleted)
     return int(deleted)
 
 
@@ -156,14 +187,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         parser.error("prune deletes rows; pass --confirm (hosted database only)")
     settings = get_env_settings()
     root = args.root or settings.data_dir / "archive"
-    keep = load_project_config().retention.raw_live_days
+    retention = load_project_config().retention
     engine = make_engine()
-    cutoff = retention_cutoff(datetime.now(UTC), keep)
-    for day in days_before(engine, cutoff):
-        if args.action == "export":
-            export_day(engine, day, root)
-        else:
-            prune_day(engine, day, root)
+    now = datetime.now(UTC)
+    for spec, keep in ((RAW, retention.raw_live_days), (FORECASTS, retention.forecasts_days)):
+        for day in days_before(engine, retention_cutoff(now, keep), spec):
+            if args.action == "export":
+                export_day(engine, day, root, spec)
+            else:
+                prune_day(engine, day, root, spec)
 
 
 if __name__ == "__main__":

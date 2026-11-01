@@ -41,3 +41,39 @@ services:
       - /var/lib/dockcast/data:/app/data:ro
     restart: unless-stopped
     logging: *logging
+
+  # Public read-only API (PRD 15, M17). Reachable only through Caddy; the rate limit sees the
+  # client address from Caddy's X-Forwarded-For.
+  api:
+    build:
+      context: ../..
+    command: ["uvicorn", "dockcast.api.app:create_app", "--factory", "--host", "0.0.0.0",
+              "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    env_file: .env
+    expose:
+      - "8000"
+    restart: unless-stopped
+    logging: *logging
+
+  # HTTPS in front of the API: automatic Let's Encrypt certificate for API_HOST
+  # (e.g. 203-0-113-7.sslip.io; owner decision 2026-11-01).
+  caddy:
+    image: caddy:2.11.6-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Unset: Caddy serves localhost only (internal certificate), so the workers still run.
+      API_HOST: ${API_HOST:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:

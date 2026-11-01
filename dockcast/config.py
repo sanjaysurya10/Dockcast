@@ -85,9 +85,10 @@ class CollectorConfig(BaseModel):
 
 
 class RetentionConfig(BaseModel):
-    """Raw-data retention in the hosted database (PRD 18.4)."""
+    """Retention in the hosted database (PRD 18.4); older rows are archived to R2, then pruned."""
 
     raw_live_days: int = Field(ge=1)
+    forecasts_days: int = Field(ge=1)
 
 
 class CleaningConfig(BaseModel):

@@ -119,6 +119,91 @@ $C up -d forecast
 $C logs --tail 5 forecast       # expect: forecast_written ... rows=342 drivers=2052
 ```
 
+## 7b. Public API over HTTPS (M17)
+
+The API runs on this VM next to the collector, behind Caddy, which gets and renews a free
+Let's Encrypt certificate. No domain is needed: `sslip.io` resolves `<ip-with-dashes>.sslip.io`
+to that IP (owner decision 2026-11-01).
+
+1. **Hostname.** With the VM's public IP, e.g. `203.0.113.7`, the host is `203-0-113-7.sslip.io`.
+2. **Oracle firewall.** Console → *Networking → Virtual cloud networks* → the VM's VCN → its
+   subnet's *Security list* → *Add ingress rules*: source `0.0.0.0/0`, TCP, destination port
+   `80`, and again for `443`.
+3. **VM firewall.** Oracle's Ubuntu images reject new inbound traffic with an iptables rule.
+   Insert the two ports above that rule and save:
+
+   ```bash
+   sudo iptables -L INPUT --line-numbers          # note the line number N of the REJECT rule
+   sudo iptables -I INPUT N -p tcp -m state --state NEW --dport 80 -j ACCEPT
+   sudo iptables -I INPUT N -p tcp -m state --state NEW --dport 443 -j ACCEPT
+   sudo netfilter-persistent save
+   ```
+
+4. **Settings.** Add to `deploy/oracle/.env` (the frontend origin comes from section 7c; use a
+   placeholder until then):
+
+   ```
+   API_HOST=203-0-113-7.sslip.io
+   API_CORS_ORIGINS=https://dockcast.pages.dev
+   ```
+
+5. **Start.**
+
+   ```bash
+   cd /opt/dockcast && git pull
+   $C build
+   $C run --rm collector alembic upgrade head      # 0007 if section 7a was skipped
+   $C up -d                                        # api and caddy join the workers
+   curl -s https://203-0-113-7.sslip.io/health     # expect "status":"ok" and a valid certificate
+   ```
+
+`GET /health` says `"status":"degraded"` (still HTTP 200) when the collector or forecast job is
+more than 30 min behind; the uptime monitor below watches for that text.
+
+## 7c. Frontend on Cloudflare Pages (M17)
+
+Cloudflare dashboard → *Workers & Pages* → *Create* → *Pages* → *Connect to Git* → the
+`Dockcast` repository, then:
+
+| Setting | Value |
+|---|---|
+| Production branch | `main` |
+| Root directory | `web` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Environment variable | `VITE_API_BASE` = `https://203-0-113-7.sslip.io` |
+
+Node 24 comes from `web/.nvmrc`. Pages rebuilds on every push to `main`. Without a `404.html`,
+Pages serves `index.html` for unknown paths, so deep links like `/station/5` work. Put the
+`*.pages.dev` URL in `API_CORS_ORIGINS` (section 7b) and run `$C up -d api`.
+
+## 7d. Uptime monitor (M17)
+
+UptimeRobot (free plan: 50 monitors, 5-min checks, keyword monitors included):
+*New monitor* → type **Keyword** → URL `https://203-0-113-7.sslip.io/health` → keyword
+`"status":"ok"` → alert when the keyword **does not exist** → interval 5 min → your email as
+the alert contact. This catches the API, the database, the collector and the forecast job.
+
+## 7e. Publish backtest results (M17)
+
+The model page reads backtest rows from the hosted database; they are computed on the research
+machine. From the repository on the research machine (local Postgres running), with the hosted
+URL from section 1.3 in your shell only:
+
+```bash
+make publish-backtest ARGS=--dry-run            # lists E1/E2/E4/E7 runs, writes nothing
+PUBLISH_DATABASE_URL='postgresql+psycopg://...' make publish-backtest
+```
+
+About 62,000 rows (≈ 18 MB). Re-running replaces the same runs. The error-analysis JSON ships
+inside the API image.
+
+## 7f. Retention of forecasts
+
+The nightly archive (section 5) now also exports forecasts issued more than 14 days ago to
+`r2:dockcast-archive/forecasts/date=YYYY-MM-DD/` and then deletes them from the hosted database,
+with the same row-count check as the raw rows.
+
 ## 8. Checks
 
 ```bash

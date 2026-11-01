@@ -4,7 +4,13 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { LABEL_ZOOM, MAP_STYLE_DARK, MAP_STYLE_LIGHT, STATION_ZOOM } from "@/lib/config";
+import {
+  fallbackStyle,
+  LABEL_ZOOM,
+  MAP_STYLE_DARK,
+  MAP_STYLE_LIGHT,
+  STATION_ZOOM,
+} from "@/lib/config";
 import type { NetFlowPoint } from "@/lib/netflow";
 import type { MapStation } from "@/lib/risk";
 import { tokenRgb } from "@/lib/tokens";
@@ -30,6 +36,15 @@ export interface GlobeMapProps {
   reducedMotion: boolean;
   dark: boolean;
   netFlow: NetFlowPoint[] | null;
+  /** Called once if the basemap fails and the plain fallback is shown. */
+  onBasemapFailed?: () => void;
+}
+
+const STYLE_TIMEOUT_MS = 8000;
+const TILE_ERRORS = 10;
+
+function cssToken(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#e8ece9";
 }
 
 const PULSE_MS = 2000;
@@ -55,11 +70,17 @@ function detailAt(zoom: number): Detail {
 export default function GlobeMap(props: GlobeMapProps) {
   const { centre, cityName, stations, selectedKey, focus, onSelect, reducedMotion, dark, netFlow } =
     props;
+  const { onBasemapFailed } = props;
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
   const introDone = useRef(false);
   const initialDark = useRef(dark);
+  const basemapFailed = useRef(false);
+  const onBasemapFailedRef = useRef(onBasemapFailed);
+  useEffect(() => {
+    onBasemapFailedRef.current = onBasemapFailed;
+  });
   const [detail, setDetail] = useState<Detail>("city");
   const [ready, setReady] = useState(false);
 
@@ -75,12 +96,33 @@ export default function GlobeMap(props: GlobeMapProps) {
     map.addControl(new NavigationControl({ visualizePitch: true }), "top-right");
     const overlay = new MapboxOverlay({ interleaved: true, layers: [] });
     map.addControl(overlay);
-    map.on("style.load", () => map.setProjection({ type: "globe" }));
+    // OpenFreeMap has no uptime guarantee (PRD 23): if the style never loads, or tiles keep
+    // failing, switch once to a plain background so stations still draw (owner decision M17).
+    let styleLoaded = false;
+    let tileErrors = 0;
+    const fallBack = () => {
+      if (basemapFailed.current) return;
+      basemapFailed.current = true;
+      onBasemapFailedRef.current?.();
+      map.setStyle(fallbackStyle(cssToken("--ground")));
+    };
+    const styleTimer = window.setTimeout(() => {
+      if (!styleLoaded) fallBack();
+    }, STYLE_TIMEOUT_MS);
+    map.on("style.load", () => {
+      styleLoaded = true;
+      map.setProjection({ type: "globe" });
+    });
+    map.on("error", (event) => {
+      if (!styleLoaded) fallBack();
+      else if ((event as { sourceId?: string }).sourceId && ++tileErrors >= TILE_ERRORS) fallBack();
+    });
     map.on("load", () => setReady(true));
     map.on("zoom", () => setDetail(detailAt(map.getZoom())));
     mapRef.current = map;
     overlayRef.current = overlay;
     return () => {
+      window.clearTimeout(styleTimer);
       map.remove();
       mapRef.current = null;
       overlayRef.current = null;
@@ -92,7 +134,8 @@ export default function GlobeMap(props: GlobeMapProps) {
     const map = mapRef.current;
     if (!map || dark === initialDark.current) return;
     initialDark.current = dark;
-    map.setStyle(dark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT);
+    if (basemapFailed.current) map.setStyle(fallbackStyle(cssToken("--ground")));
+    else map.setStyle(dark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT);
   }, [dark]);
 
   // Intro: spin the globe (about 3 deg/s) until the user interacts or 2.5 s pass, then fly in.

@@ -26,6 +26,7 @@ stale_after_min = 15
 
 [retention]
 raw_live_days = 7                     # PRD 18.4 (owner decision 2026-10-15)
+forecasts_days = 14                   # by issue day (owner decision 2026-11-01)
 
 [cleaning]                            # PRD 9.3; values from reports/eda.md, owner decisions 2026-10-25
 spike_min_delta = 8                   # obs differing by >= this from BOTH neighbours (V-shape) ...

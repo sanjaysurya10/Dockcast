@@ -3,13 +3,19 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
 from dockcast.config import CityConfig
 from dockcast.db.models import StationStatusRaw
 from dockcast.db.queries import StationRecord, ensure_city, insert_status_rows, upsert_stations
-from dockcast.ingest.archive import archive_path, days_before, export_day, prune_day
+from dockcast.ingest.archive import (
+    FORECASTS,
+    archive_path,
+    days_before,
+    export_day,
+    prune_day,
+)
 
 pytestmark = pytest.mark.integration
 CITY = CityConfig(
@@ -87,3 +93,35 @@ def test_prune_refuses_without_matching_archive(db_engine: Engine, tmp_path: Pat
         session.commit()
     assert prune_day(db_engine, DAY, tmp_path) == 0
     assert _count(db_engine) == 5
+
+
+def test_forecasts_are_archived_and_pruned_by_issue_day(db_engine: Engine, tmp_path: Path) -> None:
+    key = _seed(db_engine)
+    issued = [datetime(2026, 10, 15, 23, 45, tzinfo=UTC), datetime(2026, 10, 16, 0, 0, tzinfo=UTC)]
+    with db_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO model_versions (model_version, mlflow_run_id, kind, horizon_min, "
+                "trained_at, train_end, metrics) VALUES ('m', 'r', 'lgbm', 60, :t, :t, '{}')"
+            ),
+            {"t": issued[0]},
+        )
+        for ts in issued:
+            conn.execute(
+                text(
+                    "INSERT INTO forecasts (station_key, issued_at, horizon_min, target_ts, "
+                    "bikes_p10, bikes_p50, bikes_p90, model_version) "
+                    "VALUES (:k, :t, 60, :t + INTERVAL '60 minutes', 1, 2, 3, 'm')"
+                ),
+                {"k": key, "t": ts},
+            )
+    cutoff = datetime(2026, 10, 16, tzinfo=UTC)
+    assert days_before(db_engine, cutoff, FORECASTS) == [DAY]
+    assert export_day(db_engine, DAY, tmp_path, FORECASTS) == 1
+    frame = pd.read_parquet(archive_path(tmp_path, DAY, FORECASTS))
+    assert list(frame["bikes_p50"]) == [2] and list(frame["source_id"]) == ["1"]
+    assert prune_day(db_engine, DAY, tmp_path, FORECASTS) == 1
+    with db_engine.connect() as conn:
+        left = conn.execute(text("SELECT issued_at FROM forecasts")).scalars().all()
+    assert left == [issued[1]]
+    assert _count(db_engine) == 4  # raw rows untouched

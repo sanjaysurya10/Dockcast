@@ -176,3 +176,15 @@ test("phones get a bottom nav and a station sheet over the map", async ({ page, 
   await sections.getByRole("link", { name: "Nearby" }).click();
   await expect(page.getByRole("heading", { name: "Nearby stations" })).toBeVisible();
 });
+
+test("a failing basemap falls back to a plain background and still draws stations", async ({
+  page,
+}) => {
+  await page.unroute("https://tiles.openfreemap.org/**");
+  await page.route("https://tiles.openfreemap.org/**", (route) => route.fulfill({ status: 503 }));
+  await page.goto("/");
+  await expect(page.getByText("Basemap unavailable")).toBeVisible();
+  await expect(page.locator("[data-detail]")).toHaveAttribute("data-detail", "stations", {
+    timeout: 15_000,
+  });
+});

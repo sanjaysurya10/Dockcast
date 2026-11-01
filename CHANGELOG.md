@@ -1,5 +1,32 @@
 # Changelog
 
+## M17 — Deploy (2026-11-01)
+
+Built and tested locally; going live needs the owner's steps in `deploy/oracle/README.md` §7b–7e.
+
+- **API on the Oracle VM**: new `api` (Uvicorn) and `caddy` services in
+  `docker-compose.worker.yml`. Caddy (2.11.6) terminates HTTPS with an automatic Let's Encrypt
+  certificate for `API_HOST`, an `<ip>.sslip.io` name, so no domain is needed. It adds HSTS and
+  nosniff headers. The API sees client IPs via `X-Forwarded-For` for the per-IP limit.
+  `reports/error_analysis.json` now ships in the image (`REPORTS_DIR=/app/reports`).
+  Checked locally through Caddy: `/health`, CORS and `/v1/model/error-analysis`.
+- **Forecast retention**: the nightly archive also exports forecasts issued more than 14 days
+  ago (`retention.forecasts_days`) to R2 as Parquet, then prunes them with the same
+  row-count check. The hosted `forecasts` table was 33 MB and growing about 5 MB/day; the
+  hosted DB is at 250 of 500 MB.
+- **Backtest publishing**: `make publish-backtest` copies each experiment's default run (E1
+  `e4819616`, E2 `470f7279`, E4 `a9729858`, E7 `abd37ee6`) to the database in
+  `PUBLISH_DATABASE_URL`, replacing earlier copies of the same run.
+- **Basemap fallback**: if the OpenFreeMap style does not load within 8 s, or tiles fail 10
+  times, the map switches once to a plain background and shows "Basemap unavailable".
+  Stations, risk colours and net flow still draw.
+- **Frontend**: Cloudflare Pages settings documented (root `web`, `npm run build`, `dist`,
+  `VITE_API_BASE`). Added `web/.nvmrc` (Node 24) and `web/public/_headers` (nosniff,
+  referrer policy, geolocation for this site only, no framing).
+- **Uptime**: UptimeRobot keyword monitor on `/health` for `"status":"ok"`, every 5 min.
+- **Tests**: forecast archive/prune integration test, backtest publish test, and a Playwright
+  test with the basemap returning 503.
+
 ## M16 — Net flow, autopilot and mobile (2026-11-01)
 
 - **API**: `GET /v1/cities/{city}/netflow?window=60` (15–120, multiples of 15). It gives the net
