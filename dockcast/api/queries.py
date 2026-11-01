@@ -37,6 +37,23 @@ LATEST_FORECAST = text(
 )
 
 
+CITY_FORECAST = text(
+    """
+    SELECT f.station_key, f.issued_at, f.horizon_min, f.bikes_p10, f.bikes_p50, f.bikes_p90,
+           f.model_version
+    FROM forecasts f
+    JOIN stations s USING (station_key)
+    WHERE s.city_code = :city
+      AND f.issued_at = (
+          SELECT max(f2.issued_at) FROM forecasts f2
+          JOIN stations s2 USING (station_key)
+          WHERE s2.city_code = :city
+      )
+    ORDER BY f.station_key, f.horizon_min
+    """
+)
+
+
 def _utc(value: datetime | None) -> datetime | None:
     return None if value is None else value.astimezone(UTC)
 
@@ -64,6 +81,12 @@ def latest_forecast(conn: Connection, station_key: int) -> list[dict[str, Any]]:
     return [
         {**r, "issued_at": _utc(r["issued_at"]), "target_ts": _utc(r["target_ts"])} for r in rows
     ]
+
+
+def city_forecast(conn: Connection, city: str) -> list[dict[str, Any]]:
+    """Rows of the newest forecast cycle for every station of a city."""
+    rows = conn.execute(CITY_FORECAST, {"city": city}).mappings().all()
+    return [{**r, "issued_at": _utc(r["issued_at"])} for r in rows]
 
 
 def health(conn: Connection) -> tuple[datetime | None, datetime | None]:

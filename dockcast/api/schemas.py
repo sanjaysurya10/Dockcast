@@ -1,7 +1,7 @@
 """Response models of the read-only API (PRD 15)."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -86,6 +86,42 @@ class StationForecast(BaseModel):
     forecasts: list[HorizonForecast]
     risk: Risk | None
     data_freshness: Freshness
+
+
+class RiskStation(BaseModel):
+    """One station in ``GET /v1/cities/{city}/risk``: interim levels from the forecast range."""
+
+    station_key: int
+    name: str
+    lat: float
+    lon: float
+    capacity: int
+    now: Status | None
+    horizon_min: int
+    bikes_p10: float
+    bikes_p50: float
+    bikes_p90: float
+    empty_level: Literal["likely", "possible", "low"]
+    full_level: Literal["likely", "possible", "low"]
+    eta_empty_min: int | None
+    eta_full_min: int | None
+
+
+class CityRisk(BaseModel):
+    """``GET /v1/cities/{city}/risk``: stations ranked by empty or full risk at one window.
+
+    ``basis`` is ``forecast_range``: levels come from the regression P10/P50/P90, not from
+    calibrated event probabilities (those arrive with M10).
+    """
+
+    city: str
+    window_min: int
+    kind: Literal["empty", "full"]
+    basis: Literal["forecast_range"]
+    issued_at: datetime
+    model_version: str
+    total: int
+    stations: list[RiskStation]
 
 
 class ChampionModel(BaseModel):

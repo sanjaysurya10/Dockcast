@@ -117,3 +117,39 @@ def test_openapi_lists_the_m5_endpoints(db_engine: Engine) -> None:
         "/v1/model/summary",
     ):
         assert path in paths
+
+
+def test_city_risk_ranks_stations_from_the_forecast_range(
+    seeded: tuple[TestClient, dict[str, int]],
+) -> None:
+    client, keys = seeded
+    response = client.get("/v1/cities/dublin/risk?window=60&kind=empty&limit=200")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["basis"] == "forecast_range" and body["window_min"] == 60
+    assert body["total"] == 2 and {s["station_key"] for s in body["stations"]} == set(keys.values())
+    assert body["model_version"] == "lgbm-q-test-h60"
+    rank = {"likely": 0, "possible": 1, "low": 2}
+    order = [(rank[s["empty_level"]], s["bikes_p50"]) for s in body["stations"]]
+    assert order == sorted(order)
+    first = body["stations"][0]
+    assert first["horizon_min"] == 60 and first["now"] is not None
+    assert first["bikes_p10"] <= first["bikes_p50"] <= first["bikes_p90"]
+    page = client.get("/v1/cities/dublin/risk?window=60&kind=full&limit=1&offset=1").json()
+    assert page["total"] == 2 and len(page["stations"]) == 1
+
+
+def test_city_risk_rejects_bad_input_and_stale_forecasts(
+    seeded: tuple[TestClient, dict[str, int]], db_engine: Engine
+) -> None:
+    client, _ = seeded
+    assert client.get("/v1/cities/dublin/risk?window=45").json()["error"]["code"] == (
+        "invalid_request"
+    )
+    assert client.get("/v1/cities/dublin/risk?kind=both").status_code == 422
+    assert client.get("/v1/cities/dublin/risk?limit=201").status_code == 422
+    assert client.get("/v1/cities/paris/risk").json()["error"]["code"] == "city_not_found"
+    with db_engine.begin() as conn:
+        conn.execute(text("UPDATE forecasts SET issued_at = issued_at - INTERVAL '2 hours'"))
+    response = client.get("/v1/cities/dublin/risk")
+    assert response.status_code == 503 and response.json()["error"]["code"] == "data_stale"

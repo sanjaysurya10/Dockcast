@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cities/{city}/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * City Risk
+         * @description Stations ranked by empty or full risk at ``window`` minutes (interim, forecast range).
+         */
+        get: operations["city_risk_v1_cities__city__risk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cities/{city}/stations": {
         parameters: {
             query?: never;
@@ -171,6 +191,40 @@ export interface components {
             timezone: string;
         };
         /**
+         * CityRisk
+         * @description ``GET /v1/cities/{city}/risk``: stations ranked by empty or full risk at one window.
+         *
+         *     ``basis`` is ``forecast_range``: levels come from the regression P10/P50/P90, not from
+         *     calibrated event probabilities (those arrive with M10).
+         */
+        CityRisk: {
+            /**
+             * Basis
+             * @constant
+             */
+            basis: "forecast_range";
+            /** City */
+            city: string;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "empty" | "full";
+            /** Model Version */
+            model_version: string;
+            /** Stations */
+            stations: components["schemas"]["RiskStation"][];
+            /** Total */
+            total: number;
+            /** Window Min */
+            window_min: number;
+        };
+        /**
          * Freshness
          * @description Ages of the data behind a response.
          */
@@ -241,6 +295,45 @@ export interface components {
             p_full: number;
             /** Window Min */
             window_min: number;
+        };
+        /**
+         * RiskStation
+         * @description One station in ``GET /v1/cities/{city}/risk``: interim levels from the forecast range.
+         */
+        RiskStation: {
+            /** Bikes P10 */
+            bikes_p10: number;
+            /** Bikes P50 */
+            bikes_p50: number;
+            /** Bikes P90 */
+            bikes_p90: number;
+            /** Capacity */
+            capacity: number;
+            /**
+             * Empty Level
+             * @enum {string}
+             */
+            empty_level: "likely" | "possible" | "low";
+            /** Eta Empty Min */
+            eta_empty_min: number | null;
+            /** Eta Full Min */
+            eta_full_min: number | null;
+            /**
+             * Full Level
+             * @enum {string}
+             */
+            full_level: "likely" | "possible" | "low";
+            /** Horizon Min */
+            horizon_min: number;
+            /** Lat */
+            lat: number;
+            /** Lon */
+            lon: number;
+            /** Name */
+            name: string;
+            now: components["schemas"]["Status"] | null;
+            /** Station Key */
+            station_key: number;
         };
         /**
          * Station
@@ -361,6 +454,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["City"][];
+                };
+            };
+        };
+    };
+    city_risk_v1_cities__city__risk_get: {
+        parameters: {
+            query?: {
+                window?: number;
+                kind?: "empty" | "full";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                city: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CityRisk"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
