@@ -1,5 +1,36 @@
 # Changelog
 
+## M13 — Web scaffold (2026-11-01)
+
+- `web/`: Vite 8, React 19 and TypeScript 5.9 (strict, `noUncheckedIndexedAccess`), Tailwind 4
+  with the PRD 16.2 tokens as theme colours, plus DockCast's own dark-mode tokens. Fonts are
+  self-hosted IBM Plex Sans and Mono, and `prefers-reduced-motion` is respected globally.
+- Typed API client: `dockcast/api/openapi_export.py` writes `web/openapi.json` and
+  openapi-typescript generates `web/src/api/schema.d.ts` (`make web-api`). `apiGet` is a small
+  typed fetch that raises the PRD 15.3 error shape. A unit test fails when `openapi.json`
+  drifts from the app. TanStack Query hooks refetch live data every 60 s and forecasts every
+  15 min.
+- PRD 16.1 routes:
+  - `/`: station list with search and current state. This is the map's accessible alternative;
+    the globe itself is M14.
+  - `/station/:stationKey`: now, plus +30/+60/+120 forecasts with P10-P90. It tells "no
+    forecast yet" apart from an unknown station.
+  - `/model`: champion backtest metrics, with the MLflow run on hover.
+  - `/about`: method, limitations and sources.
+  - A 404 page, a freshness banner (status > 5 min old) and data attribution that is always
+    visible.
+- Tests:
+  - Vitest: client, status helpers including a DST case, and every route. 17 tests.
+  - Playwright smoke on desktop and Pixel 7: 6 tests.
+  - Fixtures are real hosted-DB rows from 2026-11-01.
+  - CI has a new `web` job (lint, typecheck, vitest, build, Playwright), and `make test` now
+    includes `web-test`.
+- Initial JS 112.7 KB gzip, against a 300 KB budget (PRD 16.8).
+- `[VERIFY]` resolved (PRD §23): MapLibre globe needs v5.0.0 or later; OpenFreeMap terms and
+  attribution.
+- `npm audit`: 13 moderate advisories, all in dev-only tooling (minimatch via typescript-eslint,
+  @redocly via openapi-typescript); nothing ships to the browser bundle.
+
 ## M12 — Full error analysis and v2.0.0 (2026-11-01)
 
 - `make error-analysis` now joins E2 run `470f72791f044cd39a6a9afd2a061cfd` onto E1 run

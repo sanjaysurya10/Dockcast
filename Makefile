@@ -1,4 +1,4 @@
-.PHONY: all setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest error-analysis train forecast serve results collect collector-up collector-down collector-logs health lint typecheck pytest test
+.PHONY: all setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest error-analysis train forecast serve results collect collector-up collector-down collector-logs health lint typecheck pytest test web web-api web-test web-e2e
 
 -include .env
 export
@@ -98,4 +98,17 @@ typecheck:
 pytest:
 	uv run pytest --cov --cov-report=term-missing
 
-test: lint typecheck pytest
+web-api:
+	uv run python -m dockcast.api.openapi_export
+	cd web && npm run api:types
+
+web:
+	cd web && npm run dev
+
+web-test:
+	cd web && npm run lint && npm run typecheck && npm test
+
+web-e2e:
+	cd web && npx playwright test
+
+test: lint typecheck pytest web-test

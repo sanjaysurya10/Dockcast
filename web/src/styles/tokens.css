@@ -1,0 +1,42 @@
+/* PRD 16.2 design tokens. Dark values are DockCast's own; every text pair is >= 4.5:1. */
+:root {
+  color-scheme: light;
+  --ground: #f4f5f2;
+  --surface: #ffffff;
+  --ink: #15201b;
+  --muted: #5a6560;
+  --line: #dde2de;
+  --brand: #0f766e;
+  --brand-ink: #0f5f58;
+  --brand-tint: #e3f1ee;
+  --risk-empty: #c2410c;
+  --risk-empty-ink: #9a3412;
+  --risk-empty-tint: #fdeee3;
+  --risk-full: #1d4ed8;
+  --risk-full-ink: #1e40af;
+  --risk-full-tint: #e6edfc;
+  --risk-ok: #7c8b84;
+  --radius-control: 8px;
+  --radius-card: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ground: #0e1412;
+    --surface: #161e1b;
+    --ink: #e7ece9;
+    --muted: #9ba6a0;
+    --line: #2a3531;
+    --brand: #2db3a6;
+    --brand-ink: #5fd3c6;
+    --brand-tint: #12302c;
+    --risk-empty: #f97316;
+    --risk-empty-ink: #fdba74;
+    --risk-empty-tint: #3a1e10;
+    --risk-full: #60a5fa;
+    --risk-full-ink: #93c5fd;
+    --risk-full-tint: #15233f;
+    --risk-ok: #8a9993;
+  }
+}

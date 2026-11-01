@@ -1,0 +1,673 @@
+{
+  "components": {
+    "schemas": {
+      "ChampionModel": {
+        "description": "A champion model version and its backtest metrics.",
+        "properties": {
+          "horizon_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Min"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "train_end": {
+            "format": "date-time",
+            "title": "Train End",
+            "type": "string"
+          },
+          "trained_at": {
+            "format": "date-time",
+            "title": "Trained At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_version",
+          "horizon_min",
+          "trained_at",
+          "train_end",
+          "metrics"
+        ],
+        "title": "ChampionModel",
+        "type": "object"
+      },
+      "City": {
+        "description": "One city.",
+        "properties": {
+          "centre_lat": {
+            "title": "Centre Lat",
+            "type": "number"
+          },
+          "centre_lon": {
+            "title": "Centre Lon",
+            "type": "number"
+          },
+          "city_code": {
+            "title": "City Code",
+            "type": "string"
+          },
+          "default_zoom": {
+            "title": "Default Zoom",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "city_code",
+          "name",
+          "timezone",
+          "centre_lat",
+          "centre_lon",
+          "default_zoom"
+        ],
+        "title": "City",
+        "type": "object"
+      },
+      "Freshness": {
+        "description": "Ages of the data behind a response.",
+        "properties": {
+          "forecast_age_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Age S"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "status_age_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Age S"
+          }
+        },
+        "required": [
+          "status_age_s",
+          "forecast_age_s",
+          "stale"
+        ],
+        "title": "Freshness",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Health": {
+        "description": "``GET /health``.",
+        "properties": {
+          "db": {
+            "title": "Db",
+            "type": "string"
+          },
+          "last_collector_run": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Collector Run"
+          },
+          "last_forecast_issued_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Forecast Issued At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "db",
+          "last_collector_run",
+          "last_forecast_issued_at"
+        ],
+        "title": "Health",
+        "type": "object"
+      },
+      "HorizonForecast": {
+        "description": "Quantile forecast for one horizon.",
+        "properties": {
+          "bikes_p10": {
+            "title": "Bikes P10",
+            "type": "number"
+          },
+          "bikes_p50": {
+            "title": "Bikes P50",
+            "type": "number"
+          },
+          "bikes_p90": {
+            "title": "Bikes P90",
+            "type": "number"
+          },
+          "horizon_min": {
+            "title": "Horizon Min",
+            "type": "integer"
+          },
+          "target_ts": {
+            "format": "date-time",
+            "title": "Target Ts",
+            "type": "string"
+          }
+        },
+        "required": [
+          "horizon_min",
+          "target_ts",
+          "bikes_p10",
+          "bikes_p50",
+          "bikes_p90"
+        ],
+        "title": "HorizonForecast",
+        "type": "object"
+      },
+      "ModelSummary": {
+        "description": "``GET /v1/model/summary``.",
+        "properties": {
+          "champions": {
+            "items": {
+              "$ref": "#/components/schemas/ChampionModel"
+            },
+            "title": "Champions",
+            "type": "array"
+          },
+          "last_retrain": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Retrain"
+          }
+        },
+        "required": [
+          "champions",
+          "last_retrain"
+        ],
+        "title": "ModelSummary",
+        "type": "object"
+      },
+      "Risk": {
+        "description": "P(empty) / P(full) in the next window (event models arrive in v2, M10).",
+        "properties": {
+          "p_empty": {
+            "title": "P Empty",
+            "type": "number"
+          },
+          "p_full": {
+            "title": "P Full",
+            "type": "number"
+          },
+          "window_min": {
+            "title": "Window Min",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window_min",
+          "p_empty",
+          "p_full"
+        ],
+        "title": "Risk",
+        "type": "object"
+      },
+      "Station": {
+        "description": "A station with its latest status.",
+        "properties": {
+          "capacity": {
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "title": "Lon",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "now": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Status"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Risk"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "station_key": {
+            "title": "Station Key",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station_key",
+          "name",
+          "lat",
+          "lon",
+          "capacity",
+          "is_active",
+          "now",
+          "risk"
+        ],
+        "title": "Station",
+        "type": "object"
+      },
+      "StationForecast": {
+        "description": "``GET /v1/stations/{station_key}/forecast`` (PRD 15.2).",
+        "properties": {
+          "capacity": {
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "data_freshness": {
+            "$ref": "#/components/schemas/Freshness"
+          },
+          "forecasts": {
+            "items": {
+              "$ref": "#/components/schemas/HorizonForecast"
+            },
+            "title": "Forecasts",
+            "type": "array"
+          },
+          "issued_at": {
+            "format": "date-time",
+            "title": "Issued At",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "now": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Status"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Risk"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "station_key": {
+            "title": "Station Key",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station_key",
+          "name",
+          "capacity",
+          "issued_at",
+          "model_version",
+          "now",
+          "forecasts",
+          "risk",
+          "data_freshness"
+        ],
+        "title": "StationForecast",
+        "type": "object"
+      },
+      "Status": {
+        "description": "Latest observed status of a station.",
+        "properties": {
+          "bikes": {
+            "title": "Bikes",
+            "type": "integer"
+          },
+          "docks": {
+            "title": "Docks",
+            "type": "integer"
+          },
+          "is_renting": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Renting"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bikes",
+          "docks",
+          "observed_at",
+          "is_renting"
+        ],
+        "title": "Status",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "DockCast API",
+    "version": "0.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "description": "Database reachability and freshness of the collector and the forecast job.",
+        "operationId": "get_health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Health"
+      }
+    },
+    "/v1/cities": {
+      "get": {
+        "description": "Cities with centre and zoom.",
+        "operationId": "list_cities_v1_cities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/City"
+                  },
+                  "title": "Response List Cities V1 Cities Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Cities"
+      }
+    },
+    "/v1/cities/{city}/stations": {
+      "get": {
+        "description": "All stations of a city with their latest status.",
+        "operationId": "list_stations_v1_cities__city__stations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "city",
+            "required": true,
+            "schema": {
+              "title": "City",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Station"
+                  },
+                  "title": "Response List Stations V1 Cities  City  Stations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Stations"
+      }
+    },
+    "/v1/model/summary": {
+      "get": {
+        "description": "Champion versions, last retrain and their backtest metrics (with E1 run id).",
+        "operationId": "model_summary_v1_model_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Model Summary"
+      }
+    },
+    "/v1/stations/{station_key}": {
+      "get": {
+        "description": "One station with its latest status.",
+        "operationId": "get_station_v1_stations__station_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "station_key",
+            "required": true,
+            "schema": {
+              "title": "Station Key",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Station"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Station"
+      }
+    },
+    "/v1/stations/{station_key}/forecast": {
+      "get": {
+        "description": "Latest P10/P50/P90 forecasts at +30/+60/+120 (PRD 15.2); 503 when stale.",
+        "operationId": "get_forecast_v1_stations__station_key__forecast_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "station_key",
+            "required": true,
+            "schema": {
+              "title": "Station Key",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationForecast"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Forecast"
+      }
+    }
+  }
+}

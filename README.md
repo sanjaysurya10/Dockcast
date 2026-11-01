@@ -120,7 +120,8 @@ a laptop. Outputs: `reports/experiments.md`, `reports/error_analysis.md`, `repor
 (`backfill` through `eda`) were **not** rerun from a fresh clone for this release.
 
 Live pieces: `make collect` (poll the feed every 60 s), `make train`, `make forecast`,
-`make serve` (API on localhost), `make health` (collector uptime).
+`make serve` (API on localhost), `make health` (collector uptime), `make web` (web app on
+http://localhost:5173 against the local API; `make web-api` regenerates its typed client).
 
 ## Data
 
