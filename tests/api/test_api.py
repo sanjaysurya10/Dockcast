@@ -1,5 +1,6 @@
 """API contract tests (PRD 15, 19.5) against a migrated test database."""
 
+import json
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -153,3 +154,88 @@ def test_city_risk_rejects_bad_input_and_stale_forecasts(
         conn.execute(text("UPDATE forecasts SET issued_at = issued_at - INTERVAL '2 hours'"))
     response = client.get("/v1/cities/dublin/risk")
     assert response.status_code == 503 and response.json()["error"]["code"] == "data_stale"
+
+
+def test_history_alternatives_and_drivers(seeded: tuple[TestClient, dict[str, int]]) -> None:
+    client, keys = seeded
+    history = client.get(f"/v1/stations/{keys['A']}/history?hours=6").json()
+    assert history["hours"] == 6 and 1 <= len(history["points"]) <= 24
+    stamps = [p["ts"] for p in history["points"]]
+    assert stamps == sorted(stamps)
+    assert all(p["bikes"] + p["docks"] == 30 for p in history["points"] if p["bikes"] is not None)
+    assert client.get(f"/v1/stations/{keys['A']}/history?hours=49").status_code == 422
+
+    alternatives = client.get(f"/v1/stations/{keys['A']}/alternatives?horizon=30").json()
+    assert alternatives["horizon_min"] == 30 and len(alternatives["alternatives"]) <= 2
+    for alt in alternatives["alternatives"]:
+        assert alt["station_key"] != keys["A"] and alt["bikes_p50"] >= 3
+        assert alt["walk_m"] == pytest.approx(alt["distance_m"] * 1.3, abs=0.2)
+    assert client.get(f"/v1/stations/{keys['A']}/alternatives?horizon=45").status_code == 422
+
+    drivers = client.get(f"/v1/stations/{keys['A']}/drivers?horizon=60").json()
+    sizes = [abs(d["contribution"]) for d in drivers["drivers"]]
+    assert drivers["horizon_min"] == 60 and sizes == sorted(sizes, reverse=True)
+    assert {d["feature_group"] for d in drivers["drivers"]} >= {"lags", "calendar"}
+    missing = client.get("/v1/stations/99999/drivers").json()["error"]["code"]
+    assert missing == "station_not_found"
+
+
+def test_drivers_keep_only_the_latest_issue(
+    seeded: tuple[TestClient, dict[str, int]], db_engine: Engine
+) -> None:
+    with db_engine.connect() as conn:
+        issues = conn.execute(text("SELECT count(DISTINCT issued_at) FROM forecast_drivers"))
+        assert issues.scalar() == 1
+
+
+def test_backtest_and_summary_health(
+    seeded: tuple[TestClient, dict[str, int]], db_engine: Engine
+) -> None:
+    client, _ = seeded
+    assert client.get("/v1/model/backtest").json()["error"]["code"] == "backtest_not_found"
+    with db_engine.begin() as conn:
+        for run, folds in (("small", 1), ("full", 2)):
+            for fold in range(1, folds + 1):
+                conn.execute(
+                    text(
+                        "INSERT INTO backtest_results (run_id, experiment, model_name, fold, "
+                        "horizon_min, slice_kind, slice_value, n, mae, coverage_80) VALUES "
+                        "(:run, 'E1', 'lgbm_global', :fold, 60, 'overall', 'all', 100, :mae, 0.8)"
+                    ),
+                    {"run": run, "fold": fold, "mae": 1.0 + fold},
+                )
+    body = client.get("/v1/model/backtest?experiment=E1").json()
+    assert body["run_id"] == "full"  # most folds wins
+    row = body["rows"][0]
+    assert row["folds"] == 2 and row["n"] == 200 and row["mae"] == pytest.approx(2.5)
+    picked = client.get("/v1/model/backtest?run_id=small").json()
+    assert picked["run_id"] == "small"
+    assert client.get("/v1/model/backtest?slice_kind=station").status_code == 422
+
+    health = client.get("/v1/model/summary").json()["data_health"]
+    assert health["collector_polls_7d"] == 1 and health["expected_polls_7d"] == 10080
+    assert health["stations_modelled"] == 2 and health["train_end"] is not None
+
+
+def test_error_analysis_is_served_from_the_reports_folder(
+    seeded: tuple[TestClient, dict[str, int]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = seeded
+    from dockcast.api.routes import model as model_routes
+    from dockcast.config import EnvSettings
+
+    monkeypatch.setattr(model_routes, "get_env_settings", lambda: EnvSettings(reports_dir=tmp_path))
+    assert client.get("/v1/model/error-analysis").status_code == 404
+    payload = {
+        "run_id": "r1", "e2_run_id": None, "git_commit": "abc",
+        "generated_at": "2026-11-01T00:00:00Z",
+        "folds": [{"fold": 1, "train_end": "2026-05-05T21:45:00Z",
+                   "test_start": "2026-05-05T23:45:00Z", "test_end": "2026-05-12T23:45:00Z"}],
+        "horizon_growth": [{"horizon_min": 60, "model_name": "lgbm_global", "mae": 1.46}],
+        "heatmap_hours": [0, 1], "heatmap": [{"station_key": 1, "name": "A", "mae": [0.5, None]}],
+    }  # fmt: skip
+    (tmp_path / "error_analysis.json").write_text(json.dumps(payload), encoding="utf-8")
+    body = client.get("/v1/model/error-analysis").json()
+    assert body["heatmap"][0]["mae"] == [0.5, None] and body["folds"][0]["fold"] == 1

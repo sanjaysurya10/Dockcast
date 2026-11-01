@@ -115,3 +115,101 @@ def champions(conn: Connection) -> list[dict[str, Any]]:
         {**r, "trained_at": _utc(r["trained_at"]), "train_end": _utc(r["train_end"])}
         for r in conn.execute(sql).mappings()
     ]
+
+
+HISTORY = text(
+    """
+    SELECT ts, bikes_last, docks_last, is_imputed
+    FROM station_status_15m
+    WHERE station_key = :station_key
+      AND ts > (SELECT max(ts) FROM station_status_15m WHERE station_key = :station_key)
+               - make_interval(hours => :hours)
+    ORDER BY ts
+    """
+)
+
+
+def history(conn: Connection, station_key: int, hours: int) -> list[dict[str, Any]]:
+    """The station's last ``hours`` of 15-min states, ending at its newest bucket."""
+    rows = conn.execute(HISTORY, {"station_key": station_key, "hours": hours}).mappings().all()
+    return [
+        {
+            "ts": _utc(r["ts"]),
+            "bikes": r["bikes_last"],
+            "docks": r["docks_last"],
+            "is_imputed": r["is_imputed"],
+        }
+        for r in rows
+    ]
+
+
+DRIVERS = text(
+    """
+    SELECT issued_at, feature_group, contribution
+    FROM forecast_drivers
+    WHERE station_key = :station_key AND horizon_min = :horizon
+      AND issued_at = (SELECT max(issued_at) FROM forecast_drivers WHERE station_key = :station_key)
+    """
+)
+
+
+def drivers(conn: Connection, station_key: int, horizon: int) -> list[dict[str, Any]]:
+    """Feature-group drivers of the station's newest explained forecast."""
+    rows = conn.execute(DRIVERS, {"station_key": station_key, "horizon": horizon}).mappings()
+    return [{**r, "issued_at": _utc(r["issued_at"])} for r in rows]
+
+
+DEFAULT_RUN = text(
+    """
+    SELECT run_id FROM backtest_results
+    WHERE experiment = :experiment AND slice_kind = 'overall'
+    GROUP BY run_id
+    ORDER BY count(DISTINCT fold) DESC, max(created_at) DESC
+    LIMIT 1
+    """
+)
+
+BACKTEST = text(
+    """
+    SELECT model_name, horizon_min, slice_value,
+           count(DISTINCT fold) AS folds, sum(n) AS n,
+           avg(mae) AS mae, avg(rmse) AS rmse, avg(mase) AS mase,
+           avg(coverage_80) AS coverage_80, avg(interval_width) AS interval_width
+    FROM backtest_results
+    WHERE experiment = :experiment AND run_id = :run_id AND slice_kind = :slice_kind
+    GROUP BY model_name, horizon_min, slice_value
+    ORDER BY horizon_min, model_name, slice_value
+    """
+)
+
+
+def default_run(conn: Connection, experiment: str) -> str | None:
+    """The experiment's run with the most folds, newest first."""
+    value = conn.execute(DEFAULT_RUN, {"experiment": experiment}).scalar()
+    return None if value is None else str(value)
+
+
+def backtest(
+    conn: Connection, experiment: str, run_id: str, slice_kind: str
+) -> list[dict[str, Any]]:
+    """Mean over folds per model, horizon and slice value."""
+    params = {"experiment": experiment, "run_id": run_id, "slice_kind": slice_kind}
+    return [dict(r) for r in conn.execute(BACKTEST, params).mappings()]
+
+
+def collector_polls(conn: Connection, days: int) -> int:
+    """Successful collector polls in the last ``days`` days."""
+    sql = text(
+        "SELECT count(*) FROM collector_runs "
+        "WHERE status = 'ok' AND started_at > now() - make_interval(days => :days)"
+    )
+    return int(conn.execute(sql, {"days": days}).scalar() or 0)
+
+
+def stations_modelled(conn: Connection) -> int:
+    """Stations with a forecast in the newest issue."""
+    sql = text(
+        "SELECT count(DISTINCT station_key) FROM forecasts "
+        "WHERE issued_at = (SELECT max(issued_at) FROM forecasts)"
+    )
+    return int(conn.execute(sql).scalar() or 0)

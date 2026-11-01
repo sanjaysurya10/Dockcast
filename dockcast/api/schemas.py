@@ -124,6 +124,137 @@ class CityRisk(BaseModel):
     stations: list[RiskStation]
 
 
+class HistoryPoint(BaseModel):
+    """One 15-min state (``bikes``/``docks`` are the last observation in the bucket)."""
+
+    ts: datetime
+    bikes: float | None
+    docks: float | None
+    is_imputed: bool
+
+
+class StationHistory(BaseModel):
+    """``GET /v1/stations/{station_key}/history``."""
+
+    station_key: int
+    hours: int
+    points: list[HistoryPoint]
+
+
+class Alternative(BaseModel):
+    """A nearby station with bikes forecast at the horizon."""
+
+    station_key: int
+    name: str
+    lat: float
+    lon: float
+    distance_m: float
+    walk_m: float
+    bikes_p10: float
+    bikes_p50: float
+    bikes_p90: float
+
+
+class StationAlternatives(BaseModel):
+    """``GET /v1/stations/{station_key}/alternatives``: the 2 nearest with P50 >= 3 bikes.
+
+    ``walk_m`` is the straight-line distance x 1.3, an approximation (PRD 16.4).
+    """
+
+    station_key: int
+    horizon_min: int
+    issued_at: datetime
+    alternatives: list[Alternative]
+
+
+class Driver(BaseModel):
+    """One feature group's TreeSHAP contribution to the raw P50 forecast, in bikes."""
+
+    feature_group: str
+    contribution: float
+
+
+class StationDrivers(BaseModel):
+    """``GET /v1/stations/{station_key}/drivers``, sorted by absolute contribution."""
+
+    station_key: int
+    horizon_min: int
+    issued_at: datetime
+    drivers: list[Driver]
+
+
+class BacktestRow(BaseModel):
+    """Mean over folds of one model, horizon and slice value."""
+
+    model_name: str
+    horizon_min: int
+    slice_value: str
+    folds: int
+    n: int
+    mae: float | None
+    rmse: float | None
+    mase: float | None
+    coverage_80: float | None
+    interval_width: float | None
+
+
+class Backtest(BaseModel):
+    """``GET /v1/model/backtest``."""
+
+    experiment: str
+    run_id: str
+    slice_kind: str
+    rows: list[BacktestRow]
+
+
+class FoldWindow(BaseModel):
+    """One rolling-origin fold (``reports/folds.json``)."""
+
+    fold: int
+    train_end: datetime
+    test_start: datetime
+    test_end: datetime
+
+
+class HorizonError(BaseModel):
+    """MAE of one model at one horizon over every test row."""
+
+    horizon_min: int
+    model_name: str
+    mae: float
+
+
+class HeatmapRow(BaseModel):
+    """MAE at +60 by local hour for one station (None where the hour has no rows)."""
+
+    station_key: int
+    name: str
+    mae: list[float | None]
+
+
+class ErrorAnalysis(BaseModel):
+    """``GET /v1/model/error-analysis``: slices pre-computed by ``make error-analysis``."""
+
+    run_id: str
+    e2_run_id: str | None
+    git_commit: str
+    generated_at: datetime
+    folds: list[FoldWindow]
+    horizon_growth: list[HorizonError]
+    heatmap_hours: list[int]
+    heatmap: list[HeatmapRow]
+
+
+class DataHealth(BaseModel):
+    """Collector uptime over 7 days and what the served model covers (PRD 16.5)."""
+
+    collector_polls_7d: int
+    expected_polls_7d: int
+    collector_uptime_7d: float
+    stations_modelled: int
+    train_end: datetime | None
+
+
 class ChampionModel(BaseModel):
     """A champion model version and its backtest metrics."""
 
@@ -139,3 +270,4 @@ class ModelSummary(BaseModel):
 
     champions: list[ChampionModel]
     last_retrain: datetime | None
+    data_health: DataHealth

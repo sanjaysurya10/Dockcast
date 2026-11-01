@@ -32,6 +32,7 @@ from dockcast.features.matrix import build_grid, feature_matrix
 from dockcast.models.postprocess import postprocess
 from dockcast.quality.gaps import Gap, load_gaps
 from dockcast.serving.bundle import Bundle, latest_bundle, model_version
+from dockcast.serving.drivers import driver_rows, grouped_contributions, store_drivers
 from dockcast.targets.regression import load_panel
 from dockcast.transform.resample import incremental_start, resample_per_station
 
@@ -116,6 +117,18 @@ def predict(
     Returns:
         Columns of ``forecasts``.
     """
+    return predict_with_drivers(bundle, panel, stations, calendar, issued_at, gaps)[0]
+
+
+def predict_with_drivers(
+    bundle: Bundle,
+    panel: pd.DataFrame,
+    stations: pd.DataFrame,
+    calendar: pd.DataFrame,
+    issued_at: pd.Timestamp,
+    gaps: Sequence[Gap] = (),
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """:func:`predict` plus the P50 feature-group drivers (``forecast_drivers`` rows)."""
     grid = build_grid(panel, gaps, issued_at)
     to_train = stations["source_id"].map(bundle.meta.station_keys)
     enc = bundle.encoding.merge(stations[["source_id", "station_key"]], on="source_id")
@@ -124,6 +137,7 @@ def predict(
     keys = stations["station_key"].astype(int)
     rows = pd.DataFrame({"station_key": keys, "issued_at": issued_at})
     frames = []
+    drivers = []
     for horizon, model in bundle.models.items():
         features = feature_matrix(grid, rows, horizon, calendar, info, encoding)
         features = features[features["bikes_now"].notna()]
@@ -133,6 +147,15 @@ def predict(
         known = model_input["station_key"].notna()
         model_input = model_input[known].assign(station_key=lambda f: f["station_key"].astype(int))
         quantiles = postprocess(model.predict(model_input), model_input["capacity"])
+        served_keys = features.loc[known, "station_key"].astype(int)
+        drivers.append(
+            driver_rows(
+                grouped_contributions(model.contributions(model_input)),
+                served_keys,
+                issued_at,
+                horizon,
+            )
+        )
         frames.append(
             pd.DataFrame(
                 {
@@ -147,7 +170,9 @@ def predict(
                 }
             )
         )
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    if not frames:
+        return pd.DataFrame(), pd.DataFrame()
+    return pd.concat(frames, ignore_index=True), pd.concat(drivers, ignore_index=True)
 
 
 def store(engine: Engine, frame: pd.DataFrame) -> int:
@@ -187,9 +212,12 @@ def run_cycle(engine: Engine, bundle: Bundle, now: datetime) -> int:
     panel = load_panel(engine, issued - HISTORY, issued)
     with Session(engine) as session:
         gaps = load_gaps(session)
-    frame = predict(bundle, panel, stations, calendar, pd.Timestamp(issued), gaps)
+    frame, drivers = predict_with_drivers(
+        bundle, panel, stations, calendar, pd.Timestamp(issued), gaps
+    )
     written = store(engine, frame)
-    log.info("forecast_written", issued_at=issued.isoformat(), rows=written)
+    explained = store_drivers(engine, drivers)
+    log.info("forecast_written", issued_at=issued.isoformat(), rows=written, drivers=explained)
     return written
 
 

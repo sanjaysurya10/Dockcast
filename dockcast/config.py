@@ -27,6 +27,7 @@ class EnvSettings(BaseSettings):
     log_level: str = "INFO"
     contact_email: str = ""
     data_dir: Path = PROJECT_ROOT / "data"
+    reports_dir: Path = PROJECT_ROOT / "reports"
 
     @property
     def models_dir(self) -> Path:

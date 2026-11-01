@@ -1,6 +1,186 @@
 {
   "components": {
     "schemas": {
+      "Alternative": {
+        "description": "A nearby station with bikes forecast at the horizon.",
+        "properties": {
+          "bikes_p10": {
+            "title": "Bikes P10",
+            "type": "number"
+          },
+          "bikes_p50": {
+            "title": "Bikes P50",
+            "type": "number"
+          },
+          "bikes_p90": {
+            "title": "Bikes P90",
+            "type": "number"
+          },
+          "distance_m": {
+            "title": "Distance M",
+            "type": "number"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "title": "Lon",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "station_key": {
+            "title": "Station Key",
+            "type": "integer"
+          },
+          "walk_m": {
+            "title": "Walk M",
+            "type": "number"
+          }
+        },
+        "required": [
+          "station_key",
+          "name",
+          "lat",
+          "lon",
+          "distance_m",
+          "walk_m",
+          "bikes_p10",
+          "bikes_p50",
+          "bikes_p90"
+        ],
+        "title": "Alternative",
+        "type": "object"
+      },
+      "Backtest": {
+        "description": "``GET /v1/model/backtest``.",
+        "properties": {
+          "experiment": {
+            "title": "Experiment",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "slice_kind": {
+            "title": "Slice Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "experiment",
+          "run_id",
+          "slice_kind",
+          "rows"
+        ],
+        "title": "Backtest",
+        "type": "object"
+      },
+      "BacktestRow": {
+        "description": "Mean over folds of one model, horizon and slice value.",
+        "properties": {
+          "coverage_80": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage 80"
+          },
+          "folds": {
+            "title": "Folds",
+            "type": "integer"
+          },
+          "horizon_min": {
+            "title": "Horizon Min",
+            "type": "integer"
+          },
+          "interval_width": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Width"
+          },
+          "mae": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mae"
+          },
+          "mase": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mase"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "rmse": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rmse"
+          },
+          "slice_value": {
+            "title": "Slice Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_name",
+          "horizon_min",
+          "slice_value",
+          "folds",
+          "n",
+          "mae",
+          "rmse",
+          "mase",
+          "coverage_80",
+          "interval_width"
+        ],
+        "title": "BacktestRow",
+        "type": "object"
+      },
       "ChampionModel": {
         "description": "A champion model version and its backtest metrics.",
         "properties": {
@@ -142,6 +322,168 @@
         "title": "CityRisk",
         "type": "object"
       },
+      "DataHealth": {
+        "description": "Collector uptime over 7 days and what the served model covers (PRD 16.5).",
+        "properties": {
+          "collector_polls_7d": {
+            "title": "Collector Polls 7D",
+            "type": "integer"
+          },
+          "collector_uptime_7d": {
+            "title": "Collector Uptime 7D",
+            "type": "number"
+          },
+          "expected_polls_7d": {
+            "title": "Expected Polls 7D",
+            "type": "integer"
+          },
+          "stations_modelled": {
+            "title": "Stations Modelled",
+            "type": "integer"
+          },
+          "train_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Train End"
+          }
+        },
+        "required": [
+          "collector_polls_7d",
+          "expected_polls_7d",
+          "collector_uptime_7d",
+          "stations_modelled",
+          "train_end"
+        ],
+        "title": "DataHealth",
+        "type": "object"
+      },
+      "Driver": {
+        "description": "One feature group's TreeSHAP contribution to the raw P50 forecast, in bikes.",
+        "properties": {
+          "contribution": {
+            "title": "Contribution",
+            "type": "number"
+          },
+          "feature_group": {
+            "title": "Feature Group",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feature_group",
+          "contribution"
+        ],
+        "title": "Driver",
+        "type": "object"
+      },
+      "ErrorAnalysis": {
+        "description": "``GET /v1/model/error-analysis``: slices pre-computed by ``make error-analysis``.",
+        "properties": {
+          "e2_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "E2 Run Id"
+          },
+          "folds": {
+            "items": {
+              "$ref": "#/components/schemas/FoldWindow"
+            },
+            "title": "Folds",
+            "type": "array"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "git_commit": {
+            "title": "Git Commit",
+            "type": "string"
+          },
+          "heatmap": {
+            "items": {
+              "$ref": "#/components/schemas/HeatmapRow"
+            },
+            "title": "Heatmap",
+            "type": "array"
+          },
+          "heatmap_hours": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Heatmap Hours",
+            "type": "array"
+          },
+          "horizon_growth": {
+            "items": {
+              "$ref": "#/components/schemas/HorizonError"
+            },
+            "title": "Horizon Growth",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "e2_run_id",
+          "git_commit",
+          "generated_at",
+          "folds",
+          "horizon_growth",
+          "heatmap_hours",
+          "heatmap"
+        ],
+        "title": "ErrorAnalysis",
+        "type": "object"
+      },
+      "FoldWindow": {
+        "description": "One rolling-origin fold (``reports/folds.json``).",
+        "properties": {
+          "fold": {
+            "title": "Fold",
+            "type": "integer"
+          },
+          "test_end": {
+            "format": "date-time",
+            "title": "Test End",
+            "type": "string"
+          },
+          "test_start": {
+            "format": "date-time",
+            "title": "Test Start",
+            "type": "string"
+          },
+          "train_end": {
+            "format": "date-time",
+            "title": "Train End",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fold",
+          "train_end",
+          "test_start",
+          "test_end"
+        ],
+        "title": "FoldWindow",
+        "type": "object"
+      },
       "Freshness": {
         "description": "Ages of the data behind a response.",
         "properties": {
@@ -238,6 +580,108 @@
         "title": "Health",
         "type": "object"
       },
+      "HeatmapRow": {
+        "description": "MAE at +60 by local hour for one station (None where the hour has no rows).",
+        "properties": {
+          "mae": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Mae",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "station_key": {
+            "title": "Station Key",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station_key",
+          "name",
+          "mae"
+        ],
+        "title": "HeatmapRow",
+        "type": "object"
+      },
+      "HistoryPoint": {
+        "description": "One 15-min state (``bikes``/``docks`` are the last observation in the bucket).",
+        "properties": {
+          "bikes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bikes"
+          },
+          "docks": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docks"
+          },
+          "is_imputed": {
+            "title": "Is Imputed",
+            "type": "boolean"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "bikes",
+          "docks",
+          "is_imputed"
+        ],
+        "title": "HistoryPoint",
+        "type": "object"
+      },
+      "HorizonError": {
+        "description": "MAE of one model at one horizon over every test row.",
+        "properties": {
+          "horizon_min": {
+            "title": "Horizon Min",
+            "type": "integer"
+          },
+          "mae": {
+            "title": "Mae",
+            "type": "number"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "horizon_min",
+          "model_name",
+          "mae"
+        ],
+        "title": "HorizonError",
+        "type": "object"
+      },
       "HorizonForecast": {
         "description": "Quantile forecast for one horizon.",
         "properties": {
@@ -283,6 +727,9 @@
             "title": "Champions",
             "type": "array"
           },
+          "data_health": {
+            "$ref": "#/components/schemas/DataHealth"
+          },
           "last_retrain": {
             "anyOf": [
               {
@@ -298,7 +745,8 @@
         },
         "required": [
           "champions",
-          "last_retrain"
+          "last_retrain",
+          "data_health"
         ],
         "title": "ModelSummary",
         "type": "object"
@@ -497,6 +945,72 @@
         "title": "Station",
         "type": "object"
       },
+      "StationAlternatives": {
+        "description": "``GET /v1/stations/{station_key}/alternatives``: the 2 nearest with P50 >= 3 bikes.\n\n``walk_m`` is the straight-line distance x 1.3, an approximation (PRD 16.4).",
+        "properties": {
+          "alternatives": {
+            "items": {
+              "$ref": "#/components/schemas/Alternative"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "horizon_min": {
+            "title": "Horizon Min",
+            "type": "integer"
+          },
+          "issued_at": {
+            "format": "date-time",
+            "title": "Issued At",
+            "type": "string"
+          },
+          "station_key": {
+            "title": "Station Key",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station_key",
+          "horizon_min",
+          "issued_at",
+          "alternatives"
+        ],
+        "title": "StationAlternatives",
+        "type": "object"
+      },
+      "StationDrivers": {
+        "description": "``GET /v1/stations/{station_key}/drivers``, sorted by absolute contribution.",
+        "properties": {
+          "drivers": {
+            "items": {
+              "$ref": "#/components/schemas/Driver"
+            },
+            "title": "Drivers",
+            "type": "array"
+          },
+          "horizon_min": {
+            "title": "Horizon Min",
+            "type": "integer"
+          },
+          "issued_at": {
+            "format": "date-time",
+            "title": "Issued At",
+            "type": "string"
+          },
+          "station_key": {
+            "title": "Station Key",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station_key",
+          "horizon_min",
+          "issued_at",
+          "drivers"
+        ],
+        "title": "StationDrivers",
+        "type": "object"
+      },
       "StationForecast": {
         "description": "``GET /v1/stations/{station_key}/forecast`` (PRD 15.2).",
         "properties": {
@@ -564,6 +1078,33 @@
           "data_freshness"
         ],
         "title": "StationForecast",
+        "type": "object"
+      },
+      "StationHistory": {
+        "description": "``GET /v1/stations/{station_key}/history``.",
+        "properties": {
+          "hours": {
+            "title": "Hours",
+            "type": "integer"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "station_key": {
+            "title": "Station Key",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "station_key",
+          "hours",
+          "points"
+        ],
+        "title": "StationHistory",
         "type": "object"
       },
       "Status": {
@@ -824,9 +1365,95 @@
         "summary": "List Stations"
       }
     },
+    "/v1/model/backtest": {
+      "get": {
+        "description": "Rows from ``backtest_results``, averaged over folds (default: the newest full run).",
+        "operationId": "model_backtest_v1_model_backtest_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "experiment",
+            "required": false,
+            "schema": {
+              "default": "E1",
+              "title": "Experiment",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "slice_kind",
+            "required": false,
+            "schema": {
+              "default": "overall",
+              "title": "Slice Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backtest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Model Backtest"
+      }
+    },
+    "/v1/model/error-analysis": {
+      "get": {
+        "description": "Slices pre-computed by ``make error-analysis`` (``reports/error_analysis.json``).",
+        "operationId": "model_error_analysis_v1_model_error_analysis_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorAnalysis"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Model Error Analysis"
+      }
+    },
     "/v1/model/summary": {
       "get": {
-        "description": "Champion versions, last retrain and their backtest metrics (with E1 run id).",
+        "description": "Champion versions, last retrain, backtest metrics (with E1 run id) and data health.",
         "operationId": "model_summary_v1_model_summary_get",
         "responses": {
           "200": {
@@ -883,6 +1510,106 @@
         "summary": "Get Station"
       }
     },
+    "/v1/stations/{station_key}/alternatives": {
+      "get": {
+        "description": "The 2 nearest stations with P50 >= 3 bikes at ``horizon`` (PRD 15.1, 16.4).",
+        "operationId": "station_alternatives_v1_stations__station_key__alternatives_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "station_key",
+            "required": true,
+            "schema": {
+              "title": "Station Key",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizon",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "title": "Horizon",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationAlternatives"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Station Alternatives"
+      }
+    },
+    "/v1/stations/{station_key}/drivers": {
+      "get": {
+        "description": "TreeSHAP feature-group drivers of the latest P50 forecast, largest first (PRD 16.4).",
+        "operationId": "station_drivers_v1_stations__station_key__drivers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "station_key",
+            "required": true,
+            "schema": {
+              "title": "Station Key",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizon",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "title": "Horizon",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationDrivers"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Station Drivers"
+      }
+    },
     "/v1/stations/{station_key}/forecast": {
       "get": {
         "description": "Latest P10/P50/P90 forecasts at +30/+60/+120 (PRD 15.2); 503 when stale.",
@@ -921,6 +1648,58 @@
           }
         },
         "summary": "Get Forecast"
+      }
+    },
+    "/v1/stations/{station_key}/history": {
+      "get": {
+        "description": "15-min states for the chart (PRD 16.4), ending at the newest bucket.",
+        "operationId": "station_history_v1_stations__station_key__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "station_key",
+            "required": true,
+            "schema": {
+              "title": "Station Key",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hours",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 48,
+              "minimum": 1,
+              "title": "Hours",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Station History"
       }
     }
   }

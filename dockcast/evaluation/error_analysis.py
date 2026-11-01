@@ -9,6 +9,7 @@ their MLflow runs.
 """
 
 import argparse
+import json
 import re
 from collections.abc import Sequence
 from pathlib import Path
@@ -256,6 +257,66 @@ def champions(frame: pd.DataFrame, models: Sequence[str]) -> pd.DataFrame:
     return select_champions(summary)
 
 
+def analysis_json(
+    frame: pd.DataFrame,
+    run_id: str,
+    e2_run: str | None,
+    names: pd.DataFrame,
+    folds: list[dict[str, object]],
+    model: str = "lgbm_global",
+) -> dict[str, object]:
+    """The slices ``GET /v1/model/error-analysis`` serves (PRD 16.5).
+
+    Args:
+        frame: Scored rows (as for :func:`build_report`).
+        run_id: E1 MLflow run id.
+        e2_run: E2 MLflow run id joined onto ``frame``, if any.
+        names: ``station_key, name``.
+        folds: ``reports/folds.json`` entries.
+        model: Main model for the heatmap.
+
+    Returns:
+        JSON-ready dict matching ``dockcast.api.schemas.ErrorAnalysis``.
+    """
+    present = [m for m in (model, V2_MODEL, "persistence", "ridge") if f"pred_{m}" in frame.columns]
+    scored = add_errors(frame, present)
+    growth = horizon_growth(scored, present).melt(
+        id_vars="horizon_min", var_name="model_name", value_name="mae"
+    )
+    h60 = scored[scored["horizon_min"] == 60]
+    pivot = h60.pivot_table(index="station_key", columns="hour", values=f"abs_{model}")
+    hours = list(range(24))
+    pivot = pivot.reindex(columns=[str(h) for h in hours])
+    pivot = pivot.loc[pivot.mean(axis=1).sort_values(ascending=False).index]
+    name_of = names.set_index("station_key")["name"]
+    heatmap = [
+        {
+            "station_key": int(key),
+            "name": str(name_of.get(key, key)),
+            "mae": [None if pd.isna(v) else round(float(v), 4) for v in values],
+        }
+        for key, values in zip(pivot.index, pivot.to_numpy(), strict=True)
+    ]
+    return {
+        "run_id": run_id,
+        "e2_run_id": e2_run,
+        "git_commit": git_commit(),
+        "generated_at": pd.Timestamp.now(tz="UTC").isoformat(),
+        "folds": folds,
+        "horizon_growth": [
+            {"horizon_min": int(horizon), "model_name": str(name), "mae": float(mae)}
+            for horizon, name, mae in zip(
+                growth["horizon_min"].to_numpy(dtype=int),
+                growth["model_name"].astype(str),
+                growth["mae"].to_numpy(dtype=float),
+                strict=True,
+            )
+        ],
+        "heatmap_hours": hours,
+        "heatmap": heatmap,
+    }
+
+
 def station_names(engine: Engine) -> pd.DataFrame:
     """``station_key, name``."""
     with engine.connect() as conn:
@@ -365,8 +426,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     else:
         e2_path, e2_run = latest_predictions("e2")
     frame = add_e2(pd.read_parquet(path), pd.read_parquet(e2_path))
-    text_out = build_report(frame, run_id, station_names(make_engine()), e2_run=e2_run)
+    names = station_names(make_engine())
+    text_out = build_report(frame, run_id, names, e2_run=e2_run)
     (REPORTS / "error_analysis.md").write_text(text_out, encoding="utf-8")
+    folds = json.loads((REPORTS / "folds.json").read_text(encoding="utf-8"))
+    payload = analysis_json(frame, run_id, e2_run, names, folds)
+    (REPORTS / "error_analysis.json").write_text(json.dumps(payload, indent=1), encoding="utf-8")
 
 
 if __name__ == "__main__":

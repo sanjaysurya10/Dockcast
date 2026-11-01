@@ -4,21 +4,28 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request, Response
-from sqlalchemy import Engine
+from sqlalchemy import Connection, Engine, text
 
 from dockcast.api import queries, risk
 from dockcast.api.errors import ApiError, stale, station_not_found
 from dockcast.api.schemas import (
+    Alternative,
     City,
     CityRisk,
+    Driver,
     Freshness,
+    HistoryPoint,
     HorizonForecast,
     RiskStation,
     Station,
+    StationAlternatives,
+    StationDrivers,
     StationForecast,
+    StationHistory,
     Status,
 )
 from dockcast.config import load_project_config
+from dockcast.ingest.historical.reconcile import haversine_m
 
 router = APIRouter()
 
@@ -162,4 +169,103 @@ def get_forecast(station_key: int, request: Request, response: Response) -> Stat
         forecasts=[HorizonForecast.model_validate(f) for f in forecasts],
         risk=None,
         data_freshness=Freshness(status_age_s=status_age, forecast_age_s=forecast_age, stale=False),
+    )
+
+
+WALK_FACTOR = 1.3  # PRD 16.4: haversine x 1.3, labelled "approx."
+MIN_BIKES = 3.0  # PRD 15.1: alternatives need P50 >= 3 bikes
+ALTERNATIVES = 2
+
+
+def _require_station(conn: Connection, station_key: int) -> dict[str, Any]:
+    rows = queries.stations(conn, station_key=station_key)
+    if not rows:
+        raise station_not_found(station_key)
+    return rows[0]
+
+
+@router.get("/stations/{station_key}/history", response_model=StationHistory)
+def station_history(
+    station_key: int,
+    request: Request,
+    response: Response,
+    hours: Annotated[int, Query(ge=1, le=48)] = 24,
+) -> StationHistory:
+    """15-min states for the chart (PRD 16.4), ending at the newest bucket."""
+    with _engine(request).connect() as conn:
+        _require_station(conn, station_key)
+        points = queries.history(conn, station_key, hours)
+    _cache(response, 300)
+    return StationHistory(
+        station_key=station_key,
+        hours=hours,
+        points=[HistoryPoint.model_validate(p) for p in points],
+    )
+
+
+@router.get("/stations/{station_key}/alternatives", response_model=StationAlternatives)
+def station_alternatives(
+    station_key: int, request: Request, response: Response, horizon: int = 30
+) -> StationAlternatives:
+    """The 2 nearest stations with P50 >= 3 bikes at ``horizon`` (PRD 15.1, 16.4)."""
+    horizons = load_project_config().forecast.horizons_min
+    if horizon not in horizons:
+        raise ApiError(422, "invalid_request", f"horizon must be one of {horizons}")
+    with _engine(request).connect() as conn:
+        origin = _require_station(conn, station_key)
+        city = conn.execute(
+            text("SELECT city_code FROM stations WHERE station_key = :k"), {"k": station_key}
+        ).scalar_one()
+        others = {s["station_key"]: s for s in queries.stations(conn, city=city)}
+        rows = [r for r in queries.city_forecast(conn, city) if r["horizon_min"] == horizon]
+    if not rows:
+        raise ApiError(404, "forecast_not_found", f"no forecast for station {station_key}")
+    candidates: list[Alternative] = []
+    for row in rows:
+        other = others.get(row["station_key"])
+        if other is None or row["station_key"] == station_key or row["bikes_p50"] < MIN_BIKES:
+            continue
+        distance = haversine_m(origin["lat"], origin["lon"], other["lat"], other["lon"])
+        candidates.append(
+            Alternative(
+                station_key=row["station_key"],
+                name=other["name"],
+                lat=other["lat"],
+                lon=other["lon"],
+                distance_m=round(distance, 1),
+                walk_m=round(distance * WALK_FACTOR, 1),
+                bikes_p10=row["bikes_p10"],
+                bikes_p50=row["bikes_p50"],
+                bikes_p90=row["bikes_p90"],
+            )
+        )
+    candidates.sort(key=lambda alt: alt.distance_m)
+    _cache(response, 300)
+    return StationAlternatives(
+        station_key=station_key,
+        horizon_min=horizon,
+        issued_at=rows[0]["issued_at"],
+        alternatives=candidates[:ALTERNATIVES],
+    )
+
+
+@router.get("/stations/{station_key}/drivers", response_model=StationDrivers)
+def station_drivers(
+    station_key: int, request: Request, response: Response, horizon: int = 60
+) -> StationDrivers:
+    """TreeSHAP feature-group drivers of the latest P50 forecast, largest first (PRD 16.4)."""
+    with _engine(request).connect() as conn:
+        _require_station(conn, station_key)
+        rows = queries.drivers(conn, station_key, horizon)
+    if not rows:
+        raise ApiError(404, "drivers_not_found", f"no drivers for station {station_key}")
+    _cache(response, 300)
+    ranked = sorted(rows, key=lambda r: abs(r["contribution"]), reverse=True)
+    return StationDrivers(
+        station_key=station_key,
+        horizon_min=horizon,
+        issued_at=rows[0]["issued_at"],
+        drivers=[
+            Driver(feature_group=r["feature_group"], contribution=r["contribution"]) for r in ranked
+        ],
     )

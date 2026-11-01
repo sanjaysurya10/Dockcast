@@ -4,6 +4,7 @@ from collections.abc import Callable, Sequence
 from typing import Any, Self
 
 import lightgbm as lgb
+import numpy as np
 import pandas as pd
 
 from dockcast.models.base import QUANTILE_COLUMNS
@@ -115,6 +116,25 @@ class LgbmQuantile:
             for col, q in zip(QUANTILE_COLUMNS, QUANTILES, strict=True)
         }
         return pd.DataFrame(out, index=X.index)
+
+    def contributions(self, X: pd.DataFrame) -> pd.DataFrame:  # noqa: N803
+        """TreeSHAP contributions to the raw P50 prediction (LightGBM ``pred_contrib``).
+
+        Args:
+            X: Features (with ``station_key``).
+
+        Returns:
+            One column per model feature plus ``station_key`` and ``expected_value``; each row
+            sums to the raw P50 prediction (before post-processing).
+        """
+        if not self.boosters:
+            raise RuntimeError("fit before predict")
+        frame = self._frame(X)
+        values = self.boosters[0.5].predict(
+            frame, num_iteration=self.best_iterations[0.5], pred_contrib=True
+        )
+        columns = [*frame.columns, "expected_value"]
+        return pd.DataFrame(np.asarray(values), index=X.index, columns=columns)
 
     def feature_importance(self) -> pd.Series:
         """Gain importance of the median booster."""

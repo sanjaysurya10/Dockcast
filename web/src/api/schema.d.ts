@@ -84,6 +84,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/model/backtest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Model Backtest
+         * @description Rows from ``backtest_results``, averaged over folds (default: the newest full run).
+         */
+        get: operations["model_backtest_v1_model_backtest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/model/error-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Model Error Analysis
+         * @description Slices pre-computed by ``make error-analysis`` (``reports/error_analysis.json``).
+         */
+        get: operations["model_error_analysis_v1_model_error_analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/model/summary": {
         parameters: {
             query?: never;
@@ -93,7 +133,7 @@ export interface paths {
         };
         /**
          * Model Summary
-         * @description Champion versions, last retrain and their backtest metrics (with E1 run id).
+         * @description Champion versions, last retrain, backtest metrics (with E1 run id) and data health.
          */
         get: operations["model_summary_v1_model_summary_get"];
         put?: never;
@@ -124,6 +164,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/stations/{station_key}/alternatives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Station Alternatives
+         * @description The 2 nearest stations with P50 >= 3 bikes at ``horizon`` (PRD 15.1, 16.4).
+         */
+        get: operations["station_alternatives_v1_stations__station_key__alternatives_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/stations/{station_key}/drivers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Station Drivers
+         * @description TreeSHAP feature-group drivers of the latest P50 forecast, largest first (PRD 16.4).
+         */
+        get: operations["station_drivers_v1_stations__station_key__drivers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/stations/{station_key}/forecast": {
         parameters: {
             query?: never;
@@ -144,10 +224,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/stations/{station_key}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Station History
+         * @description 15-min states for the chart (PRD 16.4), ending at the newest bucket.
+         */
+        get: operations["station_history_v1_stations__station_key__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * Alternative
+         * @description A nearby station with bikes forecast at the horizon.
+         */
+        Alternative: {
+            /** Bikes P10 */
+            bikes_p10: number;
+            /** Bikes P50 */
+            bikes_p50: number;
+            /** Bikes P90 */
+            bikes_p90: number;
+            /** Distance M */
+            distance_m: number;
+            /** Lat */
+            lat: number;
+            /** Lon */
+            lon: number;
+            /** Name */
+            name: string;
+            /** Station Key */
+            station_key: number;
+            /** Walk M */
+            walk_m: number;
+        };
+        /**
+         * Backtest
+         * @description ``GET /v1/model/backtest``.
+         */
+        Backtest: {
+            /** Experiment */
+            experiment: string;
+            /** Rows */
+            rows: components["schemas"]["BacktestRow"][];
+            /** Run Id */
+            run_id: string;
+            /** Slice Kind */
+            slice_kind: string;
+        };
+        /**
+         * BacktestRow
+         * @description Mean over folds of one model, horizon and slice value.
+         */
+        BacktestRow: {
+            /** Coverage 80 */
+            coverage_80: number | null;
+            /** Folds */
+            folds: number;
+            /** Horizon Min */
+            horizon_min: number;
+            /** Interval Width */
+            interval_width: number | null;
+            /** Mae */
+            mae: number | null;
+            /** Mase */
+            mase: number | null;
+            /** Model Name */
+            model_name: string;
+            /** N */
+            n: number;
+            /** Rmse */
+            rmse: number | null;
+            /** Slice Value */
+            slice_value: string;
+        };
         /**
          * ChampionModel
          * @description A champion model version and its backtest metrics.
@@ -225,6 +389,80 @@ export interface components {
             window_min: number;
         };
         /**
+         * DataHealth
+         * @description Collector uptime over 7 days and what the served model covers (PRD 16.5).
+         */
+        DataHealth: {
+            /** Collector Polls 7D */
+            collector_polls_7d: number;
+            /** Collector Uptime 7D */
+            collector_uptime_7d: number;
+            /** Expected Polls 7D */
+            expected_polls_7d: number;
+            /** Stations Modelled */
+            stations_modelled: number;
+            /** Train End */
+            train_end: string | null;
+        };
+        /**
+         * Driver
+         * @description One feature group's TreeSHAP contribution to the raw P50 forecast, in bikes.
+         */
+        Driver: {
+            /** Contribution */
+            contribution: number;
+            /** Feature Group */
+            feature_group: string;
+        };
+        /**
+         * ErrorAnalysis
+         * @description ``GET /v1/model/error-analysis``: slices pre-computed by ``make error-analysis``.
+         */
+        ErrorAnalysis: {
+            /** E2 Run Id */
+            e2_run_id: string | null;
+            /** Folds */
+            folds: components["schemas"]["FoldWindow"][];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Git Commit */
+            git_commit: string;
+            /** Heatmap */
+            heatmap: components["schemas"]["HeatmapRow"][];
+            /** Heatmap Hours */
+            heatmap_hours: number[];
+            /** Horizon Growth */
+            horizon_growth: components["schemas"]["HorizonError"][];
+            /** Run Id */
+            run_id: string;
+        };
+        /**
+         * FoldWindow
+         * @description One rolling-origin fold (``reports/folds.json``).
+         */
+        FoldWindow: {
+            /** Fold */
+            fold: number;
+            /**
+             * Test End
+             * Format: date-time
+             */
+            test_end: string;
+            /**
+             * Test Start
+             * Format: date-time
+             */
+            test_start: string;
+            /**
+             * Train End
+             * Format: date-time
+             */
+            train_end: string;
+        };
+        /**
          * Freshness
          * @description Ages of the data behind a response.
          */
@@ -256,6 +494,47 @@ export interface components {
             status: string;
         };
         /**
+         * HeatmapRow
+         * @description MAE at +60 by local hour for one station (None where the hour has no rows).
+         */
+        HeatmapRow: {
+            /** Mae */
+            mae: (number | null)[];
+            /** Name */
+            name: string;
+            /** Station Key */
+            station_key: number;
+        };
+        /**
+         * HistoryPoint
+         * @description One 15-min state (``bikes``/``docks`` are the last observation in the bucket).
+         */
+        HistoryPoint: {
+            /** Bikes */
+            bikes: number | null;
+            /** Docks */
+            docks: number | null;
+            /** Is Imputed */
+            is_imputed: boolean;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+        };
+        /**
+         * HorizonError
+         * @description MAE of one model at one horizon over every test row.
+         */
+        HorizonError: {
+            /** Horizon Min */
+            horizon_min: number;
+            /** Mae */
+            mae: number;
+            /** Model Name */
+            model_name: string;
+        };
+        /**
          * HorizonForecast
          * @description Quantile forecast for one horizon.
          */
@@ -281,6 +560,7 @@ export interface components {
         ModelSummary: {
             /** Champions */
             champions: components["schemas"]["ChampionModel"][];
+            data_health: components["schemas"]["DataHealth"];
             /** Last Retrain */
             last_retrain: string | null;
         };
@@ -356,6 +636,42 @@ export interface components {
             station_key: number;
         };
         /**
+         * StationAlternatives
+         * @description ``GET /v1/stations/{station_key}/alternatives``: the 2 nearest with P50 >= 3 bikes.
+         *
+         *     ``walk_m`` is the straight-line distance x 1.3, an approximation (PRD 16.4).
+         */
+        StationAlternatives: {
+            /** Alternatives */
+            alternatives: components["schemas"]["Alternative"][];
+            /** Horizon Min */
+            horizon_min: number;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /** Station Key */
+            station_key: number;
+        };
+        /**
+         * StationDrivers
+         * @description ``GET /v1/stations/{station_key}/drivers``, sorted by absolute contribution.
+         */
+        StationDrivers: {
+            /** Drivers */
+            drivers: components["schemas"]["Driver"][];
+            /** Horizon Min */
+            horizon_min: number;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /** Station Key */
+            station_key: number;
+        };
+        /**
          * StationForecast
          * @description ``GET /v1/stations/{station_key}/forecast`` (PRD 15.2).
          */
@@ -376,6 +692,18 @@ export interface components {
             name: string;
             now: components["schemas"]["Status"] | null;
             risk: components["schemas"]["Risk"] | null;
+            /** Station Key */
+            station_key: number;
+        };
+        /**
+         * StationHistory
+         * @description ``GET /v1/stations/{station_key}/history``.
+         */
+        StationHistory: {
+            /** Hours */
+            hours: number;
+            /** Points */
+            points: components["schemas"]["HistoryPoint"][];
             /** Station Key */
             station_key: number;
         };
@@ -525,6 +853,59 @@ export interface operations {
             };
         };
     };
+    model_backtest_v1_model_backtest_get: {
+        parameters: {
+            query?: {
+                experiment?: string;
+                slice_kind?: string;
+                run_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backtest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    model_error_analysis_v1_model_error_analysis_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorAnalysis"];
+                };
+            };
+        };
+    };
     model_summary_v1_model_summary_get: {
         parameters: {
             query?: never;
@@ -576,6 +957,72 @@ export interface operations {
             };
         };
     };
+    station_alternatives_v1_stations__station_key__alternatives_get: {
+        parameters: {
+            query?: {
+                horizon?: number;
+            };
+            header?: never;
+            path: {
+                station_key: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationAlternatives"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    station_drivers_v1_stations__station_key__drivers_get: {
+        parameters: {
+            query?: {
+                horizon?: number;
+            };
+            header?: never;
+            path: {
+                station_key: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationDrivers"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_forecast_v1_stations__station_key__forecast_get: {
         parameters: {
             query?: never;
@@ -594,6 +1041,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StationForecast"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    station_history_v1_stations__station_key__history_get: {
+        parameters: {
+            query?: {
+                hours?: number;
+            };
+            header?: never;
+            path: {
+                station_key: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationHistory"];
                 };
             };
             /** @description Validation Error */

@@ -201,6 +201,18 @@ class Forecast(CreatedAtMixin, Base):
     model_version: Mapped[str] = mapped_column(ForeignKey("model_versions.model_version"))
 
 
+class ForecastDriver(CreatedAtMixin, Base):
+    """TreeSHAP contribution of one feature group to a P50 forecast (latest issue only)."""
+
+    __tablename__ = "forecast_drivers"
+
+    station_key: Mapped[int] = mapped_column(ForeignKey("stations.station_key"), primary_key=True)
+    issued_at: Mapped[datetime] = mapped_column(TZ, primary_key=True)
+    horizon_min: Mapped[int] = mapped_column(Integer, primary_key=True)
+    feature_group: Mapped[str] = mapped_column(Text, primary_key=True)
+    contribution: Mapped[float] = mapped_column(REAL)
+
+
 class RiskScore(CreatedAtMixin, Base):
     """P(empty) / P(full) within a window."""
 

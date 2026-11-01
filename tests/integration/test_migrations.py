@@ -15,6 +15,7 @@ PRD_TABLES = {
     "weather_hourly",
     "calendar_days",
     "model_versions",
+    "forecast_drivers",
     "forecasts",
     "risk_scores",
     "backtest_results",
@@ -39,7 +40,7 @@ def _current_revision(url: str) -> str | None:
 def test_migrations_upgrade_and_downgrade(postgres_url: str) -> None:
     config = alembic_config(postgres_url)
     command.upgrade(config, "head")
-    assert _current_revision(postgres_url) == "0006"
+    assert _current_revision(postgres_url) == "0007"
     engine = create_engine(postgres_url)
     assert set(inspect(engine).get_table_names()) >= PRD_TABLES
     engine.dispose()
