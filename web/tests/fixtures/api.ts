@@ -1,12 +1,19 @@
 import type {
+  Backtest,
   City,
   CityRisk,
+  ErrorAnalysis,
   Health,
   ModelSummary,
   RiskStation,
   Station,
+  StationAlternatives,
+  StationDrivers,
   StationForecast,
+  StationHistory,
 } from "@/api/client";
+
+import errorAnalysisJson from "../../../reports/error_analysis.json" with { type: "json" };
 
 /**
  * Real-shaped API responses for tests. Station rows and statuses are the hosted database's
@@ -98,6 +105,14 @@ export const MODEL_SUMMARY: ModelSummary = {
     champion(60, 1.460765689208001, 0.8490414066701389, 0.8139580496384038),
   ],
   last_retrain: "2026-10-27T01:09:11.935612Z",
+  // Hosted DB at 2026-11-01 13:35 UTC: 10,082 ok polls in 7 days (VM + fallback overlap).
+  data_health: {
+    collector_polls_7d: 10082,
+    expected_polls_7d: 10080,
+    collector_uptime_7d: 1,
+    stations_modelled: 114,
+    train_end: "2026-07-01T00:00:00Z",
+  },
 };
 
 export function health(lastCollectorRun: string | null): Health {
@@ -182,6 +197,141 @@ export const CITIES: City[] = [
   },
 ];
 
+/** Hosted `station_status_15m` for station 5, 06:30-12:15 UTC on 2026-11-01: [hh:mm, bikes]. */
+const HISTORY_5_BIKES: [string, number][] = [
+  ["06:30", 0], ["06:45", 0], ["07:00", 0], ["07:15", 0], ["07:30", 0], ["07:45", 0],
+  ["08:00", 0], ["08:15", 0], ["08:30", 0], ["08:45", 0], ["09:00", 0], ["09:15", 1],
+  ["09:30", 0], ["09:45", 2], ["10:00", 2], ["10:15", 1], ["10:30", 1], ["10:45", 4],
+  ["11:00", 4], ["11:15", 21], ["11:30", 23], ["11:45", 23], ["12:00", 24], ["12:15", 17],
+]; // prettier-ignore
+
+export const HISTORY_5: StationHistory = {
+  station_key: 5,
+  hours: 6,
+  points: HISTORY_5_BIKES.map(([time, bikes]) => ({
+    ts: `2026-11-01T${time}:00Z`,
+    bikes,
+    docks: 40 - bikes,
+    is_imputed: false,
+  })),
+};
+
+function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const rad = Math.PI / 180;
+  const a =
+    Math.sin(((lat2 - lat1) * rad) / 2) ** 2 +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(a));
+}
+
+/** `GET /alternatives` from the real forecasts with the server's rule (P50 >= 3, 2 nearest). */
+export function alternativesResponse(stationKey: number, horizon: number): StationAlternatives {
+  const origin = STATIONS.find((s) => s.station_key === stationKey);
+  const rows = STATIONS.filter((s) => s.station_key !== stationKey && origin)
+    .map((s) => {
+      const [, p10, p50, p90] = FORECASTS[s.station_key]?.find(([h]) => h === horizon) ?? [0, 0, 0, 0];
+      const distance = haversineM(origin?.lat ?? 0, origin?.lon ?? 0, s.lat, s.lon);
+      return {
+        station_key: s.station_key,
+        name: s.name,
+        lat: s.lat,
+        lon: s.lon,
+        distance_m: Math.round(distance * 10) / 10,
+        walk_m: Math.round(distance * 1.3 * 10) / 10,
+        bikes_p10: p10,
+        bikes_p50: p50,
+        bikes_p90: p90,
+      };
+    })
+    .filter((row) => row.bikes_p50 >= 3)
+    .sort((a, b) => a.distance_m - b.distance_m)
+    .slice(0, 2);
+  return {
+    station_key: stationKey,
+    horizon_min: horizon,
+    issued_at: "2026-11-01T12:15:00Z",
+    alternatives: rows,
+  };
+}
+
+/**
+ * ILLUSTRATIVE driver values (no real TreeSHAP output exists yet: the hosted forecast job has
+ * not been redeployed with M15). Test-only; never shown as real data.
+ */
+export const DRIVERS_5: StationDrivers = {
+  station_key: 5,
+  horizon_min: 60,
+  issued_at: "2026-11-01T12:15:00Z",
+  drivers: [
+    { feature_group: "lags", contribution: 6.2 },
+    { feature_group: "station", contribution: -2.4 },
+    { feature_group: "calendar", contribution: 1.1 },
+    { feature_group: "rolling", contribution: -0.6 },
+    { feature_group: "seasonal", contribution: 0.3 },
+    { feature_group: "station_static", contribution: 0.1 },
+  ],
+};
+
+const E1_BACKTEST_RUN = "e4819616d7034b90abcb3adc882313da";
+
+/** Local `backtest_results` of E1 run e4819616, overall, mean over 8 folds (2026-11-01). */
+const E1_OVERALL: [string, number, number, number, number, number, number | null, number | null][] = [
+  ["lgbm_global", 30, 604621, 0.9947, 1.9885, 0.9335, 0.8246, 3.0984],
+  ["persistence", 30, 604621, 1.0659, 2.2184, 1.0, null, null],
+  ["ridge", 30, 604621, 1.1795, 2.1346, 1.1076, null, null],
+  ["seasonal_naive_7d", 30, 604621, 6.3545, 8.6892, 5.9928, null, null],
+  ["lgbm_global", 60, 602561, 1.4608, 2.6875, 0.849, 0.814, 4.5949],
+  ["persistence", 60, 602561, 1.7213, 3.3258, 1.0, null, null],
+  ["ridge", 60, 602561, 1.8689, 3.104, 1.0869, null, null],
+  ["seasonal_naive_7d", 60, 602561, 6.354, 8.6881, 3.7083, null, null],
+  ["lgbm_global", 120, 598447, 2.0469, 3.4462, 0.74, 0.7972, 6.4353],
+  ["persistence", 120, 598447, 2.7681, 4.9888, 1.0, null, null],
+  ["ridge", 120, 598447, 2.874, 4.3435, 1.0399, null, null],
+  ["seasonal_naive_7d", 120, 598447, 6.354, 8.6877, 2.3061, null, null],
+];
+
+/** Same run, `lgbm_global` at +60 by local hour: [coverage, mae]. */
+const E1_HOUR_60: [number, number][] = [
+  [0.7877, 0.8922], [0.8598, 0.3822], [0.9103, 0.032], [0.8989, 0.013], [0.8935, 0.0083],
+  [0.7612, 0.2478], [0.7848, 1.2773], [0.7849, 1.8323], [0.7565, 2.446], [0.7916, 2.559],
+  [0.8198, 2.056], [0.8145, 1.8083], [0.8122, 1.8591], [0.7934, 2.1494], [0.8169, 1.9223],
+  [0.8182, 1.8245], [0.7928, 2.082], [0.7937, 2.2948], [0.7765, 2.1974], [0.8024, 1.8794],
+  [0.806, 1.5627], [0.8187, 1.3026], [0.8104, 1.1862], [0.8308, 1.1224],
+]; // prettier-ignore
+
+export function backtestResponse(sliceKind: string): Backtest {
+  const rows =
+    sliceKind === "hour"
+      ? E1_HOUR_60.map(([coverage, mae], hour) => ({
+          model_name: "lgbm_global",
+          horizon_min: 60,
+          slice_value: String(hour),
+          folds: 8,
+          n: 0,
+          mae,
+          rmse: null,
+          mase: null,
+          coverage_80: coverage,
+          interval_width: null,
+        }))
+      : E1_OVERALL.map(([model_name, horizon_min, n, mae, rmse, mase, coverage_80, interval_width]) => ({
+          model_name,
+          horizon_min,
+          slice_value: "all",
+          folds: 8,
+          n,
+          mae,
+          rmse,
+          mase,
+          coverage_80,
+          interval_width,
+        }));
+  return { experiment: "E1", run_id: E1_BACKTEST_RUN, slice_kind: sliceKind, rows };
+}
+
+/** The real `reports/error_analysis.json` (E1 e4819616 + E2 470f7279). */
+export const ERROR_ANALYSIS = errorAnalysisJson as ErrorAnalysis;
+
 /** Route table shared by the unit and e2e mocks. */
 export function mockResponse(url: string, now: Date = new Date()): { status: number; body: unknown } {
   const parsed = new URL(url);
@@ -197,6 +347,24 @@ export function mockResponse(url: string, now: Date = new Date()): { status: num
   if (path === "/v1/cities/dublin/stations") return { status: 200, body: STATIONS };
   if (path === "/v1/stations/5/forecast") return { status: 200, body: FORECAST_5 };
   if (path === "/v1/model/summary") return { status: 200, body: MODEL_SUMMARY };
+  if (path === "/v1/stations/5/history") return { status: 200, body: HISTORY_5 };
+  if (path === "/v1/stations/5/drivers") return { status: 200, body: DRIVERS_5 };
+  const alternatives = /^\/v1\/stations\/(\d+)\/alternatives$/.exec(path);
+  if (alternatives) {
+    const horizon = Number(parsed.searchParams.get("horizon") ?? 30);
+    return { status: 200, body: alternativesResponse(Number(alternatives[1]), horizon) };
+  }
+  if (path === "/v1/model/backtest") {
+    const experiment = parsed.searchParams.get("experiment") ?? "E1";
+    if (experiment !== "E1") {
+      return {
+        status: 404,
+        body: { error: { code: "backtest_not_found", message: `no backtest rows for ${experiment}` } },
+      };
+    }
+    return { status: 200, body: backtestResponse(parsed.searchParams.get("slice_kind") ?? "overall") };
+  }
+  if (path === "/v1/model/error-analysis") return { status: 200, body: ERROR_ANALYSIS };
   if (path === "/v1/stations/15/forecast") {
     return {
       status: 404,

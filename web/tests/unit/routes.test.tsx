@@ -90,11 +90,32 @@ describe("routes", () => {
     expect(await screen.findByRole("heading", { name: "GRAND CANAL DOCK" })).toBeInTheDocument();
   });
 
-  it("shows a station forecast with its P10-P90 range", async () => {
+  it("station page: tiles, chart table, risk badge, backups and drivers", async () => {
     renderAt("/station/5");
     expect(await screen.findByRole("heading", { name: "CHARLEMONT PLACE" })).toBeInTheDocument();
-    expect(screen.getByText("21.9")).toBeInTheDocument();
+    // Tiles: bikes now, docks now, +60 and +120 (PRD 16.4).
     expect(screen.getByText("likely 17–27 (P10–P90)")).toBeInTheDocument();
+    expect(screen.getByText("likely 13–27 (P10–P90)")).toBeInTheDocument();
+    expect(screen.queryByText("likely 19–26 (P10–P90)")).not.toBeInTheDocument(); // no +30 tile
+    // Chart data table lists all three horizons.
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("row")).toHaveLength(4);
+    expect(await screen.findByText("Not at risk at +60")).toBeInTheDocument();
+    // Backups: the 2 nearest with P50 >= 3 at +30 (real coordinates and forecasts).
+    const backups = await screen.findByRole("heading", { name: "Backup stations" });
+    const list = backups.parentElement?.querySelector("ul");
+    expect(list).not.toBeNull();
+    const names = within(list as HTMLElement).getAllByRole("link").map((link) => link.textContent);
+    expect(names).toHaveLength(2);
+    expect(names[0]).toContain("FOWNES STREET UPPER");
+    expect(names[0]).toContain("approx. 2.0 km walk");
+    // Drivers: top 4 by absolute contribution, plain language.
+    const chips = await screen.findAllByRole("listitem", { name: undefined });
+    const drivers = chips.map((chip) => chip.textContent ?? "").filter((text) => /[↑↓]/.test(text));
+    expect(drivers).toHaveLength(4);
+    expect(drivers[0]).toContain("Bikes there now and in the last 2 hours");
+    expect(drivers[1]).toContain("This station's usual pattern");
+    expect(drivers[1]).toContain("−2.4");
   });
 
   it("shows not found for an unknown station", async () => {
@@ -107,11 +128,37 @@ describe("routes", () => {
     expect(await screen.findByRole("heading", { name: "No forecast yet" })).toBeInTheDocument();
   });
 
-  it("shows champion metrics with the run id on hover", async () => {
+  it("model page: served metrics with the run id on hover", async () => {
     renderAt("/model");
-    const row = (await screen.findByText("+60 min")).closest("tr");
+    const served = await screen.findByRole("table", {
+      name: "Backtest metrics of the served model per horizon",
+    });
+    const row = within(served).getByRole("rowheader", { name: "+60 min" }).closest("tr");
     expect(row).toHaveAttribute("title", "MLflow run fb0d738826974ae9982cc4e96b96e5ba");
     expect(row).toHaveTextContent("1.461");
+  });
+
+  it("model page: results table highlights the best value per column", async () => {
+    renderAt("/model");
+    const table = await screen.findByRole("table", { name: "+60 min" });
+    const lgbm = within(table).getByRole("rowheader", { name: "LightGBM (global)" }).closest("tr");
+    expect(lgbm).toHaveTextContent("1.461 (best)");
+    expect(lgbm).toHaveAttribute("title", "MLflow run e4819616d7034b90abcb3adc882313da");
+    const persistence = within(table).getByRole("rowheader", { name: "Persistence (no change)" });
+    expect(persistence.closest("tr")).not.toHaveTextContent("(best)");
+  });
+
+  it("model page: folds, heatmap, data health and missing experiments", async () => {
+    renderAt("/model");
+    const folds = await screen.findByRole("list", { name: "Backtest folds" });
+    expect(within(folds).getAllByRole("listitem")).toHaveLength(8);
+    expect(screen.getByRole("img", { name: /115 stations/ })).toBeInTheDocument();
+    expect(screen.getByText("100.0 %")).toBeInTheDocument();
+    expect(screen.getByText("114")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Experiment"), { target: { value: "E7" } });
+    expect(
+      await screen.findByText("No backtest results for E7 are published in this database yet."),
+    ).toBeInTheDocument();
   });
 
   it("always shows the data attribution", async () => {

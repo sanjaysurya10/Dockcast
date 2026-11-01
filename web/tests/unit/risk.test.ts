@@ -56,3 +56,38 @@ describe("helpers", () => {
     expect(hexToRgb("not a colour")).toEqual([124, 139, 132]);
   });
 });
+
+describe("station page helpers", () => {
+  it("joins history to the forecast fan, anchored at the count the model saw", async () => {
+    const { forecastChartData } = await import("@/lib/chartData");
+    const { FORECAST_5, HISTORY_5 } = await import("../fixtures/api");
+    const data = forecastChartData(HISTORY_5, FORECAST_5);
+    const anchor = data.find((point) => point.t === Date.parse(FORECAST_5.issued_at));
+    expect(anchor).toMatchObject({ actual: 17, p50: 17, band: [17, 17] });
+    expect(data.at(-1)?.band).toEqual([12.9375, 26.8173]);
+    expect(data.map((point) => point.t)).toEqual([...data.map((point) => point.t)].sort());
+  });
+
+  it("orders drivers and labels walks", async () => {
+    const { topDrivers, walkLabel } = await import("@/lib/drivers");
+    const { DRIVERS_5 } = await import("../fixtures/api");
+    expect(topDrivers(DRIVERS_5).map((chip) => chip.group)).toEqual([
+      "lags",
+      "station",
+      "calendar",
+      "rolling",
+    ]);
+    expect(walkLabel(312)).toBe("approx. 300 m walk");
+    expect(walkLabel(10)).toBe("approx. 50 m walk");
+    expect(walkLabel(2034)).toBe("approx. 2.0 km walk");
+  });
+
+  it("picks the best value per column", async () => {
+    const { bestByMetric } = await import("@/lib/backtest");
+    const { backtestResponse } = await import("../fixtures/api");
+    const rows = backtestResponse("overall").rows.filter((row) => row.horizon_min === 60);
+    const best = bestByMetric(rows);
+    expect([...best.mae]).toEqual(["lgbm_global"]);
+    expect([...best.coverage_80]).toEqual(["lgbm_global"]);
+  });
+});

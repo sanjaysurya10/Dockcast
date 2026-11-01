@@ -1,5 +1,58 @@
 # Changelog
 
+## M15 — Station detail and model pages (2026-11-01)
+
+- **API**:
+  - `GET /v1/stations/{key}/history?hours=1..48`: 15-min states from `station_status_15m`.
+  - `GET /v1/stations/{key}/alternatives?horizon=`: the 2 nearest stations with P50 ≥ 3,
+    with walk distance approximated as haversine × 1.3.
+  - `GET /v1/stations/{key}/drivers?horizon=`: TreeSHAP feature-group contributions to P50,
+    largest first.
+  - `GET /v1/model/backtest?experiment=&slice_kind=&run_id=`: `backtest_results` averaged over
+    folds. By default it uses the run with the most folds, newest first.
+  - `GET /v1/model/error-analysis`: serves `reports/error_analysis.json`, now also written by
+    `make error-analysis` (runs e4819616 and 470f7279).
+  - `/v1/model/summary` gains `data_health`: 7-day collector uptime, stations modelled and the
+    training end date.
+- **Forecast job**: writes P50 TreeSHAP drivers per feature group to `forecast_drivers`
+  (migration 0007, latest issue only). `LgbmQuantile.contributions` sums exactly to the raw P50
+  (tested). New setting `REPORTS_DIR`.
+- **Station page** (PRD 16.4):
+  - header with an interim +60 risk badge;
+  - tiles for now, +60 and +120;
+  - Recharts chart of the last 6 h actual plus the 2 h forecast fan (P10–P90), with a "now"
+    marker, an empty zone and a data-table alternative;
+  - 2 backup stations with approximate walk distance;
+  - "What drives this forecast" chips: the top 4 groups, in plain language.
+- **Model page** (PRD 16.5):
+  - served-model metrics;
+  - backtest results for E1/E2/E4/E7 with the best value per column highlighted;
+  - fold diagram;
+  - station × hour MAE heatmap, single hue;
+  - MAE vs horizon;
+  - +60 coverage by hour against the 0.70–0.90 band;
+  - data-health tiles.
+  - Every number shows its MLflow run, in a caption or on hover. Event calibration waits for
+    M10.
+- **Charts**: series colours `--series-1/2` pass the dataviz palette validator in light and
+  dark mode; baselines are muted and dashed. The station and model pages are lazy-loaded.
+  Initial JS is 115 KB gzip; Recharts is a separate 102 KB chunk.
+- **Fixes found in the visual check**:
+  - the forecast fan now starts at the count the model saw at issue time;
+  - the risk badge reads "Not at risk";
+  - overlapping chart labels were replaced by a legend;
+  - fold labels no longer wrap;
+  - the heatmap caption is correct in dark mode.
+- **Tests**:
+  - pytest: drivers (SHAP sums, grouping, every forecast row explained) and 4 API contract
+    tests.
+  - Vitest: 31 tests on real fixtures (station 5's history, E1 backtest rows,
+    `error_analysis.json`). The driver values in the fixture are illustrative and labelled
+    test-only.
+  - Playwright: 16 tests.
+- **Not live yet**: hosted drivers need the VM update (`deploy/oracle/README.md` §7a), and the
+  hosted DB has no `backtest_results` or error-analysis JSON until M17 publishes them.
+
 ## M14 — Globe map (2026-11-01)
 
 - API: `GET /v1/cities/{city}/risk?window=30|60|120&kind=empty|full&limit=1..200&offset=`.

@@ -86,3 +86,18 @@ test("deep links work on the preview server", async ({ page }) => {
   await page.goto("/model");
   await expect(page.getByRole("heading", { name: "Model accuracy" })).toBeVisible();
 });
+
+test("station page draws the forecast chart", async ({ page }) => {
+  await page.goto("/station/5");
+  await expect(page.getByRole("heading", { name: "CHARLEMONT PLACE" })).toBeVisible();
+  await expect(page.locator(".recharts-surface").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Backup stations" })).toBeVisible();
+  await expect(page.getByText("Bikes there now and in the last 2 hours")).toBeVisible();
+});
+
+test("model page draws its charts", async ({ page }) => {
+  await page.goto("/model");
+  await expect(page.getByRole("table", { name: "+60 min" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /115 stations/ })).toBeVisible();
+  await expect(page.locator(".recharts-surface")).toHaveCount(2);
+});

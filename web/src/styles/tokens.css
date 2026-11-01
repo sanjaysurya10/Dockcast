@@ -1,4 +1,5 @@
-/* PRD 16.2 design tokens. Dark values are DockCast's own; every text pair is >= 4.5:1. */
+/* PRD 16.2 design tokens. Dark values are DockCast's own; every text pair is >= 4.5:1.
+   --series-* are chart series colours, checked with the dataviz palette validator. */
 :root {
   color-scheme: light;
   --ground: #f4f5f2;
@@ -16,6 +17,8 @@
   --risk-full-ink: #1e40af;
   --risk-full-tint: #e6edfc;
   --risk-ok: #7c8b84;
+  --series-1: #0d9488;
+  --series-2: #7c3aed;
   --radius-control: 8px;
   --radius-card: 12px;
 }
@@ -38,5 +41,7 @@
     --risk-full-ink: #93c5fd;
     --risk-full-tint: #15233f;
     --risk-ok: #8a9993;
+    --series-1: #14a396;
+    --series-2: #9b7af0;
   }
 }

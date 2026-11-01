@@ -100,3 +100,9 @@ export async function apiGet<P extends GetPath>(
 
 export type CityRisk = components["schemas"]["CityRisk"];
 export type RiskStation = components["schemas"]["RiskStation"];
+export type StationHistory = components["schemas"]["StationHistory"];
+export type StationAlternatives = components["schemas"]["StationAlternatives"];
+export type StationDrivers = components["schemas"]["StationDrivers"];
+export type Backtest = components["schemas"]["Backtest"];
+export type BacktestRow = components["schemas"]["BacktestRow"];
+export type ErrorAnalysis = components["schemas"]["ErrorAnalysis"];

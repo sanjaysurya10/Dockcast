@@ -1,18 +1,26 @@
+import { lazy, Suspense } from "react";
 import { Outlet, type RouteObject } from "react-router";
 
+import { Loading } from "@/components/QueryState";
 import { AboutPage } from "@/pages/AboutPage";
 import { MapPage } from "@/pages/MapPage";
-import { ModelPage } from "@/pages/ModelPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
-import { StationPage } from "@/pages/StationPage";
 
 import { Layout } from "./Layout";
+
+// Chart pages load Recharts on demand, keeping it out of the initial bundle (PRD 16.8).
+const StationPage = lazy(async () => ({
+  default: (await import("@/pages/StationPage")).StationPage,
+}));
+const ModelPage = lazy(async () => ({ default: (await import("@/pages/ModelPage")).ModelPage }));
 
 /** Text pages get a centred column; the map page is full-bleed. */
 function Contained() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6">
-      <Outlet />
+      <Suspense fallback={<Loading label="the page" />}>
+        <Outlet />
+      </Suspense>
     </div>
   );
 }

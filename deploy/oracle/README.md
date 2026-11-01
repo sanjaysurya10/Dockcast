@@ -106,6 +106,19 @@ The job loads the newest bundle in `/var/lib/dockcast/data/models`, marks it cha
 `model_versions`, and skips a cycle when the newest live row is older than 30 min. Stations not
 in the bundle's training set get no forecast until the next retrain.
 
+## 7a. Update to M15 (forecast drivers)
+
+M15 adds migration `0007` (`forecast_drivers`). The forecast job now also writes the TreeSHAP
+feature-group drivers of each forecast, keeping only the latest issue (about 2,000 rows).
+
+```bash
+cd /opt/dockcast && git pull
+$C build
+$C run --rm collector alembic upgrade head      # expect: Running upgrade 0006 -> 0007
+$C up -d forecast
+$C logs --tail 5 forecast       # expect: forecast_written ... rows=342 drivers=2052
+```
+
 ## 8. Checks
 
 ```bash

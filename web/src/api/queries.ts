@@ -72,3 +72,66 @@ export function useCityRisk(
     retry: false,
   });
 }
+
+export function useStationHistory(stationKey: number, hours: number) {
+  return useQuery({
+    queryKey: ["history", stationKey, hours],
+    queryFn: ({ signal }) =>
+      apiGet("/v1/stations/{station_key}/history", {
+        path: { station_key: stationKey },
+        query: { hours },
+        signal,
+      }),
+    refetchInterval: 5 * MINUTE,
+    enabled: stationKey > 0,
+  });
+}
+
+export function useAlternatives(stationKey: number, horizon: number) {
+  return useQuery({
+    queryKey: ["alternatives", stationKey, horizon],
+    queryFn: ({ signal }) =>
+      apiGet("/v1/stations/{station_key}/alternatives", {
+        path: { station_key: stationKey },
+        query: { horizon },
+        signal,
+      }),
+    refetchInterval: 5 * MINUTE,
+    enabled: stationKey > 0,
+    retry: false,
+  });
+}
+
+export function useDrivers(stationKey: number, horizon: number) {
+  return useQuery({
+    queryKey: ["drivers", stationKey, horizon],
+    queryFn: ({ signal }) =>
+      apiGet("/v1/stations/{station_key}/drivers", {
+        path: { station_key: stationKey },
+        query: { horizon },
+        signal,
+      }),
+    refetchInterval: 15 * MINUTE,
+    enabled: stationKey > 0,
+    retry: false,
+  });
+}
+
+export function useBacktest(experiment: string, sliceKind: string) {
+  return useQuery({
+    queryKey: ["backtest", experiment, sliceKind],
+    queryFn: ({ signal }) =>
+      apiGet("/v1/model/backtest", { query: { experiment, slice_kind: sliceKind }, signal }),
+    staleTime: 60 * MINUTE,
+    retry: false,
+  });
+}
+
+export function useErrorAnalysis() {
+  return useQuery({
+    queryKey: ["error-analysis"],
+    queryFn: ({ signal }) => apiGet("/v1/model/error-analysis", { signal }),
+    staleTime: 60 * MINUTE,
+    retry: false,
+  });
+}

@@ -17,6 +17,8 @@
   --color-risk-full-ink: var(--risk-full-ink);
   --color-risk-full-tint: var(--risk-full-tint);
   --color-risk-ok: var(--risk-ok);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
   --radius-control: var(--radius-control);
   --radius-card: var(--radius-card);
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
