@@ -102,3 +102,10 @@ def test_v2_report_has_slices_and_champion(tmp_path: Path, monkeypatch: pytest.M
     text = ea.build_report(frame, "run123", names, e2_run="e2run")
     assert "# Error analysis (v2)" in text and "e2run" in text
     assert "## 7. Metrics by slice" in text and "## 8. Champion" in text
+
+
+def test_slice_order() -> None:
+    bands = ["40+", "<20", "30-39", "20-29"]
+    assert sorted(bands, key=ea.slice_order) == ["<20", "20-29", "30-39", "40+"]
+    assert sorted(["10", "2", "0"], key=ea.slice_order) == ["0", "2", "10"]
+    assert sorted(["weekend", "weekday"], key=ea.slice_order) == ["weekday", "weekend"]

@@ -9,6 +9,7 @@ their MLflow runs.
 """
 
 import argparse
+import re
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -194,6 +195,15 @@ def metric_row(part: pd.DataFrame, models: Sequence[str]) -> dict[str, float]:
     return row
 
 
+def slice_order(value: object) -> tuple[int, float, str]:
+    """Sort key: ``<20`` first, then numbers by value (``20-29`` < ``40+``), then text."""
+    label = str(value)
+    if label.startswith("<"):
+        return (0, -1.0, label)
+    number = re.match(r"\d+", label)
+    return (0, float(number.group()), label) if number else (1, 0.0, label)
+
+
 def slice_metrics(frame: pd.DataFrame, models: Sequence[str]) -> pd.DataFrame:
     """PRD 13.3 slices: overall per horizon, then each slice at +60.
 
@@ -213,7 +223,7 @@ def slice_metrics(frame: pd.DataFrame, models: Sequence[str]) -> pd.DataFrame:
     for column in SLICE_COLUMNS:
         if column not in rows.columns:
             continue
-        values = sorted(rows[column].unique(), key=lambda v: (len(str(v)), str(v)))
+        values = sorted(rows[column].unique(), key=slice_order)
         for value in values:
             part = rows[rows[column] == value]
             records.append({"slice": column, "value": str(value), **metric_row(part, models)})
