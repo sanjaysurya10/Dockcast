@@ -22,7 +22,9 @@ type JsonResponse<P extends GetPath> =
     : never;
 
 type ParamsOf<P extends GetPath, Where extends "path" | "query"> =
-  GetOperation<P>["parameters"] extends Record<Where, infer Params> ? Params : never;
+  GetOperation<P>["parameters"] extends { [K in Where]?: infer Params }
+    ? Exclude<Params, undefined>
+    : never;
 
 export interface RequestOptions<P extends GetPath> {
   path?: ParamsOf<P, "path">;
@@ -95,3 +97,6 @@ export async function apiGet<P extends GetPath>(
   if (!response.ok) throw await errorFrom(response);
   return (await response.json()) as JsonResponse<P>;
 }
+
+export type CityRisk = components["schemas"]["CityRisk"];
+export type RiskStation = components["schemas"]["RiskStation"];

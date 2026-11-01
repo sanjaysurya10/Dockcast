@@ -43,3 +43,32 @@ export function useHealth() {
     refetchInterval: MINUTE,
   });
 }
+
+export function useCities() {
+  return useQuery({
+    queryKey: ["cities"],
+    queryFn: ({ signal }) => apiGet("/v1/cities", { signal }),
+    staleTime: 60 * MINUTE,
+  });
+}
+
+/** Ranked interim risk at one horizon (`basis: forecast_range`); 60 s refresh like live data. */
+export function useCityRisk(
+  window: number | null,
+  kind: "empty" | "full",
+  limit: number,
+  city: string = CITY,
+) {
+  return useQuery({
+    queryKey: ["risk", city, window, kind, limit],
+    queryFn: ({ signal }) =>
+      apiGet("/v1/cities/{city}/risk", {
+        path: { city },
+        query: { window: window ?? undefined, kind, limit },
+        signal,
+      }),
+    refetchInterval: MINUTE,
+    enabled: window !== null,
+    retry: false,
+  });
+}

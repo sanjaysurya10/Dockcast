@@ -1,11 +1,25 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { routes } from "@/app/routes";
+import type { GlobeMapProps } from "@/components/map/GlobeMap";
 
 import { mockResponse } from "../fixtures/api";
+
+// WebGL does not exist in jsdom: the stub prints the state counts the map would draw.
+vi.mock("@/components/map/GlobeMap", () => ({
+  default: ({ stations, selectedKey }: GlobeMapProps) => {
+    const counts = new Map<string, number>();
+    for (const station of stations) counts.set(station.state, (counts.get(station.state) ?? 0) + 1);
+    return (
+      <div data-testid="map-stub" data-selected={selectedKey ?? ""}>
+        {[...counts].map(([state, count]) => `${state}:${count}`).join(" ")}
+      </div>
+    );
+  },
+}));
 
 function renderAt(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -29,14 +43,51 @@ beforeEach(() => {
 });
 
 describe("routes", () => {
-  it("lists stations with their state and filters by name", async () => {
+  it("map page: legend counts follow the horizon toggle", async () => {
     renderAt("/");
-    expect(await screen.findByText("HARDWICKE STREET")).toBeInTheDocument();
-    expect(screen.getByText("5 of 5 stations")).toBeInTheDocument();
-    expect(screen.getAllByText("Empty")).toHaveLength(1);
-    expect(screen.getAllByText("Full")).toHaveLength(1);
+    const map = await screen.findByTestId("map-stub");
+    expect(map).toHaveTextContent("ok:3 full:1 empty:1");
+    fireEvent.click(screen.getByLabelText("+60"));
+    await waitFor(() =>
+      expect(screen.getByTestId("map-stub")).toHaveTextContent(
+        "ok:2 full:1 empty:1 full-possible:1",
+      ),
+    );
+    const legend = screen.getByTestId("legend");
+    expect(within(legend).getByText("Likely empty")).toBeInTheDocument();
+    expect(legend.querySelector('[data-state="full-possible"]')).toHaveTextContent("May fill1");
+  });
+
+  it("map page: at-risk list ranks from the forecast range and opens the station panel", async () => {
+    renderAt("/");
+    await screen.findByTestId("map-stub");
+    fireEvent.click(screen.getByLabelText("+60"));
+    const list = await screen.findByRole("heading", { name: "At risk at +60 min" });
+    expect(list).toBeInTheDocument();
+    const hardwicke = await screen.findByRole("button", { name: /HARDWICKE STREET/ });
+    expect(hardwicke).toHaveTextContent("Empty by +30 min");
+    expect(hardwicke).toHaveTextContent("Likely empty");
+    fireEvent.click(screen.getByRole("button", { name: "Full" }));
+    const full = await screen.findAllByRole("button", { name: /FOWNES|PRINCES/ });
+    expect(full.map((button) => button.textContent)).toEqual([
+      expect.stringContaining("FOWNES STREET UPPER"),
+      expect.stringContaining("PRINCES STREET"),
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: /FOWNES STREET UPPER/ }));
+    expect(await screen.findByRole("heading", { name: "FOWNES STREET UPPER" })).toBeInTheDocument();
+    expect(screen.getByTestId("map-stub")).toHaveAttribute("data-selected", "14");
+    expect(screen.getByRole("link", { name: "Open details" })).toHaveAttribute(
+      "href",
+      "/station/14",
+    );
+  });
+
+  it("map page: station search is the keyboard alternative to the map", async () => {
+    renderAt("/");
+    await screen.findByTestId("map-stub");
     fireEvent.change(screen.getByLabelText("Search stations"), { target: { value: "grand" } });
-    expect(screen.getByText("1 of 5 stations")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "GRAND CANAL DOCK" }));
+    expect(await screen.findByRole("heading", { name: "GRAND CANAL DOCK" })).toBeInTheDocument();
   });
 
   it("shows a station forecast with its P10-P90 range", async () => {

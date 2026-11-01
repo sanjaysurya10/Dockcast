@@ -1,4 +1,12 @@
-import type { Health, ModelSummary, Station, StationForecast } from "@/api/client";
+import type {
+  City,
+  CityRisk,
+  Health,
+  ModelSummary,
+  RiskStation,
+  Station,
+  StationForecast,
+} from "@/api/client";
 
 /**
  * Real-shaped API responses for tests. Station rows and statuses are the hosted database's
@@ -101,10 +109,91 @@ export function health(lastCollectorRun: string | null): Health {
   };
 }
 
+/** Hosted-DB forecasts of the 2026-11-01 12:15 UTC issue: [horizon, p10, p50, p90]. */
+const FORECASTS: Record<number, [number, number, number, number][]> = {
+  5: [[30, 19.073, 22.768, 25.675], [60, 17.146, 21.935, 26.823], [120, 12.938, 20.011, 26.817]],
+  14: [[30, 23.488, 28.817, 30], [60, 20.015, 29.603, 30], [120, 16.879, 28.536, 30]],
+  15: [[30, 0, 0, 1.045], [60, 0, 0.055, 1.482], [120, 0, 0.2, 1.976]],
+  33: [[30, 12.663, 16.098, 19.585], [60, 10.693, 17.995, 22.577], [120, 8.137, 19.575, 22.151]],
+  68: [[30, 29.596, 33.02, 36.139], [60, 28.123, 33.166, 37.419], [120, 22.395, 30.283, 37.881]],
+};
+
+type Level = "likely" | "possible" | "low";
+const NEAR_ZERO = 0.5; // dockcast/api/risk.py
+
+function level(likely: number, possible: number): Level {
+  if (likely <= NEAR_ZERO) return "likely";
+  return possible <= NEAR_ZERO ? "possible" : "low";
+}
+
+function eta(rows: [number, number, number, number][], free: (p50: number) => number) {
+  return rows.find(([, , p50]) => free(p50) <= NEAR_ZERO)?.[0] ?? null;
+}
+
+/** `GET /v1/cities/dublin/risk` built from the real forecasts with the server's rules. */
+export function riskResponse(window: number, kind: "empty" | "full", limit: number): CityRisk {
+  const rank: Record<Level, number> = { likely: 0, possible: 1, low: 2 };
+  const rows: RiskStation[] = STATIONS.map((s) => {
+    const all = FORECASTS[s.station_key] ?? [];
+    const [, p10, p50, p90] = all.find(([h]) => h === window) ?? [window, 0, 0, 0];
+    return {
+      station_key: s.station_key,
+      name: s.name,
+      lat: s.lat,
+      lon: s.lon,
+      capacity: s.capacity,
+      now: s.now,
+      horizon_min: window,
+      bikes_p10: p10,
+      bikes_p50: p50,
+      bikes_p90: p90,
+      empty_level: level(p50, p10),
+      full_level: level(s.capacity - p50, s.capacity - p90),
+      eta_empty_min: eta(all, (b) => b),
+      eta_full_min: eta(all, (b) => s.capacity - b),
+    };
+  });
+  const free = (r: RiskStation) => (kind === "empty" ? r.bikes_p50 : r.capacity - r.bikes_p50);
+  rows.sort(
+    (a, b) =>
+      rank[kind === "empty" ? a.empty_level : a.full_level] -
+        rank[kind === "empty" ? b.empty_level : b.full_level] || free(a) - free(b),
+  );
+  return {
+    city: "dublin",
+    window_min: window,
+    kind,
+    basis: "forecast_range",
+    issued_at: "2026-11-01T12:15:00Z",
+    model_version: `lgbm-q-2026-06-30-3c421b6-h${window}`,
+    total: rows.length,
+    stations: rows.slice(0, limit),
+  };
+}
+
+export const CITIES: City[] = [
+  {
+    city_code: "dublin",
+    name: "Dublin",
+    timezone: "Europe/Dublin",
+    centre_lat: 53.3473,
+    centre_lon: -6.2591,
+    default_zoom: 13,
+  },
+];
+
 /** Route table shared by the unit and e2e mocks. */
 export function mockResponse(url: string, now: Date = new Date()): { status: number; body: unknown } {
-  const path = new URL(url).pathname;
+  const parsed = new URL(url);
+  const path = parsed.pathname;
   if (path === "/health") return { status: 200, body: health(now.toISOString()) };
+  if (path === "/v1/cities") return { status: 200, body: CITIES };
+  if (path === "/v1/cities/dublin/risk") {
+    const query = parsed.searchParams;
+    const kind = query.get("kind") === "full" ? "full" : "empty";
+    const body = riskResponse(Number(query.get("window") ?? 60), kind, Number(query.get("limit") ?? 20));
+    return { status: 200, body };
+  }
   if (path === "/v1/cities/dublin/stations") return { status: 200, body: STATIONS };
   if (path === "/v1/stations/5/forecast") return { status: 200, body: FORECAST_5 };
   if (path === "/v1/model/summary") return { status: 200, body: MODEL_SUMMARY };

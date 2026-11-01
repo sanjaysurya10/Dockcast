@@ -1,5 +1,46 @@
 # Changelog
 
+## M14 — Globe map (2026-11-01)
+
+- API: `GET /v1/cities/{city}/risk?window=30|60|120&kind=empty|full&limit=1..200&offset=`.
+  - Stations are ranked by interim empty/full levels from the latest forecast range (owner
+    decision, PRD §23). Each row carries P10/P50/P90 at the window, both levels and the ETA
+    (the first horizon where P50 is empty or full).
+  - The endpoint returns 503 when forecasts are stale, 404 for an unknown city and 422 for a
+    bad window.
+- Web map page (PRD 16.3, items 1-6, 9-11):
+  - MapLibre globe that spins at 3°/s for 2.5 s or until the user interacts, then flies to
+    Dublin over 4 s. With `prefers-reduced-motion` it jumps instead.
+  - Level of detail: a city marker with the station count below zoom 9, deck.gl circles sized
+    by capacity from zoom 9, and station names from zoom 15.
+  - Horizon toggle (Now · +30 · +60 · +120). "Now" colours by the current state; forecast
+    horizons use the interim levels: likely = solid fill, "may" = tint with a coloured ring.
+  - Legend with a count per state, so meaning is never carried by colour alone.
+  - At-risk panel: top 20 empty or full, with ETA and a level badge, labelled "from the
+    forecast range, not a probability".
+  - Station panel with now and +30/+60/+120 (P50 and range), opened from the list or the map,
+    with a link to the details page.
+  - Also: station search (the keyboard alternative), a city selector, and the OpenFreeMap
+    basemap in light and dark. The map falls back to the current state when forecasts are
+    unavailable, and to the lists when WebGL is missing.
+- Fixes found in the visual check:
+  - MapLibre's CSS set the map container to zero height.
+  - maplibre-gl 6 breaks deck.gl 9.4, so it is pinned to 5.24.0 (PRD §23).
+  - Markers were announced as "Map marker".
+- Tests:
+  - pytest: risk levels, ETA and ranking (`tests/unit/test_risk.py`), plus 2 API contract
+    tests.
+  - Vitest: 26 tests, including the real 2026-11-01 12:15 forecasts, where +30 and +60 give
+    different colours.
+  - Playwright: 12 tests on desktop and Pixel 7, covering globe load, spin and fly-in, the
+    horizon toggle changing colours, the station panel, and the reduced-motion path. 24/24
+    pass with `--repeat-each 2`.
+- Bundle: initial JS is 116.8 KB gzip. The map chunk (MapLibre + deck.gl, 462 KB gzip) is
+  lazy-loaded and outside the PRD 16.8 budget.
+- Not done, for M15/M16: alternatives in the station panel (needs the alternatives endpoint),
+  autopilot, net flow, and the mobile bottom sheet and nav. PRD 16.3's "mercator below
+  zoom 6 on mobile" `[VERIFY performance]` is untested on real phones.
+
 ## M13 — Web scaffold (2026-11-01)
 
 - `web/`: Vite 8, React 19 and TypeScript 5.9 (strict, `noUncheckedIndexedAccess`), Tailwind 4

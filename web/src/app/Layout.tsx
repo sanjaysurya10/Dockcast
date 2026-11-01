@@ -43,7 +43,7 @@ export function Layout() {
         </nav>
       </header>
       <FreshnessBanner />
-      <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+      <main id="main" className="flex flex-1 flex-col">
         <Outlet />
       </main>
       <Attribution />
