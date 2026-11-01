@@ -1,6 +1,6 @@
 # Error analysis (v2)
 
-MLflow run `e4819616d7034b90abcb3adc882313da` (E1) and `470f72791f044cd39a6a9afd2a061cfd` (E2: `lgbm_per_cluster` and the in-fold E3 cluster on the same rows) · git `6d7393c` · 1805629 scored test rows, folds 1-8, horizons +30, +60, +120 · target 2026-05-06 → 2026-06-30 UTC. Main model `lgbm_global`; errors are prediction - actual (bikes). No weather features.
+MLflow run `e4819616d7034b90abcb3adc882313da` (E1) and `470f72791f044cd39a6a9afd2a061cfd` (E2: `lgbm_per_cluster` and the in-fold E3 cluster on the same rows) · git `baa7da7` · 1805629 scored test rows, folds 1-8, horizons +30, +60, +120 · target 2026-05-06 → 2026-06-30 UTC. Main model `lgbm_global`; errors are prediction - actual (bikes). No weather features.
 
 ## 1. Top 10 stations by MAE (+60)
 
