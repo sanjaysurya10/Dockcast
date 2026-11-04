@@ -32,6 +32,11 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Text pages grow once data arrives; keep the scrollbar's space so the column does not jump. */
+html:has(.page-contained) {
+  scrollbar-gutter: stable;
+}
+
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

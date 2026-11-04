@@ -104,7 +104,11 @@ test("station page draws the forecast chart", async ({ page }) => {
 test("model page draws its charts", async ({ page }) => {
   await page.goto("/model");
   await expect(page.getByRole("table", { name: "+60 min" })).toBeVisible();
+  // Charts below the fold render when they scroll into view.
+  await expect(page.locator(".recharts-surface")).toHaveCount(0);
+  await page.getByRole("heading", { name: "Where the model is wrong" }).scrollIntoViewIfNeeded();
   await expect(page.getByRole("img", { name: /115 stations/ })).toBeVisible();
+  await page.getByRole("heading", { name: "Calibration" }).scrollIntoViewIfNeeded();
   await expect(page.locator(".recharts-surface")).toHaveCount(2);
 });
 

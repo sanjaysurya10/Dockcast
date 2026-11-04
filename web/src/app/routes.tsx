@@ -23,7 +23,7 @@ const ModelPage = lazy(async () => ({ default: (await import("@/pages/ModelPage"
 /** Text pages get a centred column; the map page is full-bleed. */
 function Contained() {
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6">
+    <div className="page-contained mx-auto w-full max-w-5xl px-4 py-6">
       <Suspense fallback={<Loading label="the page" />}>
         <Outlet />
       </Suspense>

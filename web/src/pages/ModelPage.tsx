@@ -7,6 +7,7 @@ import { FoldDiagram } from "@/components/model/FoldDiagram";
 import { HorizonChart } from "@/components/model/HorizonChart";
 import { ResultsTable } from "@/components/model/ResultsTable";
 import { ErrorMessage, Loading } from "@/components/QueryState";
+import { WhenVisible } from "@/components/WhenVisible";
 import { championRows } from "@/lib/status";
 
 const EXPERIMENTS = [
@@ -128,7 +129,11 @@ export function ModelPage() {
             ))}
           </select>
         </label>
-        {backtest.isPending && <Loading label="backtest results" />}
+        {backtest.isPending && (
+          <div className="min-h-[36rem]">
+            <Loading label="backtest results" />
+          </div>
+        )}
         {backtest.isError && (
           <p className="text-sm text-muted">
             No backtest results for {experiment} are published in this database yet.
@@ -159,16 +164,20 @@ export function ModelPage() {
           <p className="text-sm text-muted">The error analysis is not published yet.</p>
         )}
         {analysis.data && (
-          <div className="grid gap-8 lg:grid-cols-2">
-            <ErrorHeatmap analysis={analysis.data} />
-            <HorizonChart analysis={analysis.data} />
-          </div>
+          <WhenVisible minHeight={640}>
+            <div className="grid gap-8 lg:grid-cols-2">
+              <ErrorHeatmap analysis={analysis.data} />
+              <HorizonChart analysis={analysis.data} />
+            </div>
+          </WhenVisible>
         )}
       </Section>
 
       <Section id="calibration-heading" title="Calibration">
         {hourly.data ? (
-          <CoverageChart backtest={hourly.data} />
+          <WhenVisible minHeight={320}>
+            <CoverageChart backtest={hourly.data} />
+          </WhenVisible>
         ) : (
           hourly.isError && <p className="text-sm text-muted">Coverage by hour is not published yet.</p>
         )}
