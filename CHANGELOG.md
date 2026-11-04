@@ -2,7 +2,10 @@
 
 ## M17 — Deploy (2026-11-01)
 
-Built and tested locally; going live needs the owner's steps in `deploy/oracle/README.md` §7b–7e.
+Live since 2026-11-04: frontend https://dockcast.pages.dev, API
+https://143-47-249-111.sslip.io (hosted DB migrated 0006 → 0007), UptimeRobot keyword monitor
+on `/health`. Backtests published to the hosted DB: 61,584 rows from E1 `e4819616`,
+E2 `470f7279`, E4 `a9729858`, E7 `abd37ee6`. Setup steps are in `deploy/oracle/README.md` §7b–7e.
 
 - **API on the Oracle VM**: new `api` (Uvicorn) and `caddy` services in
   `docker-compose.worker.yml`. Caddy (2.11.6) terminates HTTPS with an automatic Let's Encrypt
