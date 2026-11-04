@@ -23,9 +23,15 @@ test.beforeEach(async ({ page }) => {
   await mockBackends(page);
 });
 
+/** Phones start the globe on a tap; wide screens start it on their own once idle. */
+async function openMap(page: Page, isMobile: boolean) {
+  await page.goto("/");
+  if (isMobile) await page.getByRole("button", { name: "Show map" }).click();
+}
+
 test.describe("map", () => {
-  test("globe loads, spins and flies in to the station layer", async ({ page }) => {
-    await page.goto("/");
+  test("globe loads, spins and flies in to the station layer", async ({ page, isMobile }) => {
+    await openMap(page, isMobile);
     await expect(page.locator(".maplibregl-canvas")).toBeVisible();
     await expect(page.getByRole("button", { name: /Dublin · 5 stations/ })).toBeVisible();
     // 2.5 s spin + 4 s fly-in, then zoom 13 shows stations instead of the city marker.
@@ -65,8 +71,8 @@ test.describe("map", () => {
 test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
-  test("skips the spin and fly-in", async ({ page }) => {
-    await page.goto("/");
+  test("skips the spin and fly-in", async ({ page, isMobile }) => {
+    await openMap(page, isMobile);
     await expect(page.locator("[data-detail]")).toHaveAttribute("data-detail", "stations", {
       timeout: 5_000,
     });
@@ -179,12 +185,22 @@ test("phones get a bottom nav and a station sheet over the map", async ({ page, 
 
 test("a failing basemap falls back to a plain background and still draws stations", async ({
   page,
+  isMobile,
 }) => {
   await page.unroute("https://tiles.openfreemap.org/**");
   await page.route("https://tiles.openfreemap.org/**", (route) => route.fulfill({ status: 503 }));
-  await page.goto("/");
+  await openMap(page, isMobile);
   await expect(page.getByText("Basemap unavailable")).toBeVisible();
   await expect(page.locator("[data-detail]")).toHaveAttribute("data-detail", "stations", {
     timeout: 15_000,
   });
+});
+
+test("phones show stations first and load the globe only when asked", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "phone layout only");
+  await page.goto("/");
+  await expect(page.getByRole("complementary", { name: "Stations" })).toBeVisible();
+  await expect(page.locator(".maplibregl-canvas")).toHaveCount(0);
+  await page.getByRole("button", { name: "Show map" }).click();
+  await expect(page.locator(".maplibregl-canvas")).toBeVisible();
 });

@@ -2,14 +2,19 @@ import { lazy, Suspense } from "react";
 import { Outlet, type RouteObject } from "react-router";
 
 import { Loading } from "@/components/QueryState";
-import { AboutPage } from "@/pages/AboutPage";
-import { MapPage } from "@/pages/MapPage";
-import { NearbyPage } from "@/pages/NearbyPage";
-import { NotFoundPage } from "@/pages/NotFoundPage";
 
 import { Layout } from "./Layout";
 
-// Chart pages load Recharts on demand, keeping it out of the initial bundle (PRD 16.8).
+// Every page is its own chunk, so the first load only fetches the page it shows (PRD 16.8);
+// chart pages also keep Recharts out of the other pages.
+const MapPage = lazy(async () => ({ default: (await import("@/pages/MapPage")).MapPage }));
+const NearbyPage = lazy(async () => ({
+  default: (await import("@/pages/NearbyPage")).NearbyPage,
+}));
+const AboutPage = lazy(async () => ({ default: (await import("@/pages/AboutPage")).AboutPage }));
+const NotFoundPage = lazy(async () => ({
+  default: (await import("@/pages/NotFoundPage")).NotFoundPage,
+}));
 const StationPage = lazy(async () => ({
   default: (await import("@/pages/StationPage")).StationPage,
 }));
@@ -31,7 +36,14 @@ export const routes: RouteObject[] = [
   {
     element: <Layout />,
     children: [
-      { index: true, element: <MapPage /> },
+      {
+        index: true,
+        element: (
+          <Suspense fallback={<Loading label="the map" />}>
+            <MapPage />
+          </Suspense>
+        ),
+      },
       {
         element: <Contained />,
         children: [

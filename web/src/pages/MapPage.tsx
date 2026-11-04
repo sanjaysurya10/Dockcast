@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { RiskStation } from "@/api/client";
 import { useCities, useCityRisk, useNetFlow, useStations } from "@/api/queries";
@@ -18,13 +18,35 @@ import { CITY } from "@/lib/config";
 import { netFlowSummary } from "@/lib/netflow";
 import { type Horizon, mapStations } from "@/lib/risk";
 import { useAutopilot } from "@/lib/useAutopilot";
-import { useDarkMode, useReducedMotion } from "@/lib/useMediaQuery";
+import { useDarkMode, useMediaQuery, useReducedMotion } from "@/lib/useMediaQuery";
 
 const GlobeMap = lazy(() => import("@/components/map/GlobeMap"));
 
 const ALL_STATIONS = 200;
 const STATION_FOCUS_ZOOM = 16;
 const AUTOPILOT_DEFAULT_WINDOW = 60;
+const IDLE_TIMEOUT_MS = 2000;
+
+/**
+ * Whether the WebGL globe should start. It is the slowest part of the page, so the station list
+ * and legend paint first: wide screens start it once the browser is idle, phones on a tap.
+ */
+function useMapStart(wide: boolean): [boolean, () => void] {
+  const [started, setStarted] = useState(false);
+  const start = useCallback(() => setStarted(true), []);
+  useEffect(() => {
+    if (!wide || started) return;
+    // Safari has no requestIdleCallback.
+    const idle = window.requestIdleCallback as Window["requestIdleCallback"] | undefined;
+    if (idle) {
+      const handle = idle(start, { timeout: IDLE_TIMEOUT_MS });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const timer = window.setTimeout(start, 200);
+    return () => window.clearTimeout(timer);
+  }, [wide, started, start]);
+  return [started, start];
+}
 
 /** The command center (PRD 16.3): globe map, horizon toggle, at-risk panel, station panel. */
 export function MapPage() {
@@ -40,6 +62,7 @@ export function MapPage() {
   const handleBasemapFailed = useCallback(() => setBasemapFailed(true), []);
   const reducedMotion = useReducedMotion();
   const dark = useDarkMode();
+  const [mapStarted, startMap] = useMapStart(useMediaQuery("(min-width: 768px)"));
   // "Now" colours need no forecast, but autopilot still tours the +60 risk ranking.
   const risk = useCityRisk(
     horizon === "now" ? AUTOPILOT_DEFAULT_WINDOW : horizon,
@@ -108,28 +131,40 @@ export function MapPage() {
     <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
       <h1 className="sr-only">{city?.name ?? "Dublin"} bike availability map</h1>
       <div className="relative min-h-0 flex-1 md:min-h-[600px]">
-        <MapErrorBoundary>
-          <Suspense
-            fallback={
-              <p role="status" className="p-4 text-muted">
-                Loading map…
-              </p>
-            }
-          >
-            <GlobeMap
-              centre={centre}
-              cityName={city?.name ?? "Dublin"}
-              stations={markers}
-              selectedKey={selectedKey}
-              focus={focus}
-              onSelect={selectOnMap}
-              reducedMotion={reducedMotion}
-              dark={dark}
-              netFlow={netFlowOn && netFlow.data ? flow.points : null}
-              onBasemapFailed={handleBasemapFailed}
-            />
-          </Suspense>
-        </MapErrorBoundary>
+        {mapStarted ? (
+          <MapErrorBoundary>
+            <Suspense
+              fallback={
+                <p role="status" className="p-4 text-muted">
+                  Loading map…
+                </p>
+              }
+            >
+              <GlobeMap
+                centre={centre}
+                cityName={city?.name ?? "Dublin"}
+                stations={markers}
+                selectedKey={selectedKey}
+                focus={focus}
+                onSelect={selectOnMap}
+                reducedMotion={reducedMotion}
+                dark={dark}
+                netFlow={netFlowOn && netFlow.data ? flow.points : null}
+                onBasemapFailed={handleBasemapFailed}
+              />
+            </Suspense>
+          </MapErrorBoundary>
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <button
+              type="button"
+              onClick={startMap}
+              className="inline-flex min-h-11 items-center rounded-control border border-line bg-surface px-4 text-sm font-medium shadow-sm"
+            >
+              Show map
+            </button>
+          </div>
+        )}
         <div className="pointer-events-none absolute left-3 right-14 top-3 flex flex-wrap items-start gap-2">
           <div className="pointer-events-auto">
             <HorizonToggle value={horizon} onChange={setHorizon} />
@@ -162,10 +197,19 @@ export function MapPage() {
           <div className="pointer-events-auto">
             <MapTools
               netFlowOn={netFlowOn}
-              onNetFlow={setNetFlowOn}
+              onNetFlow={(on) => {
+                if (on) startMap();
+                setNetFlowOn(on);
+              }}
               autopilotOn={autopilot.active}
               autopilotStops={stops.length}
-              onAutopilot={autopilot.active ? autopilot.stop : autopilot.start}
+              onAutopilot={() => {
+                if (autopilot.active) autopilot.stop();
+                else {
+                  startMap();
+                  autopilot.start();
+                }
+              }}
             />
           </div>
         </div>

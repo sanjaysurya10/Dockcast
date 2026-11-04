@@ -32,6 +32,12 @@ function renderAt(path: string) {
   return router;
 }
 
+/** jsdom has no matchMedia, so the page lays out as a phone and the map waits for a tap. */
+async function showMap() {
+  fireEvent.click(await screen.findByRole("button", { name: "Show map" }));
+  return screen.findByTestId("map-stub");
+}
+
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
@@ -45,7 +51,7 @@ beforeEach(() => {
 describe("routes", () => {
   it("map page: legend counts follow the horizon toggle", async () => {
     renderAt("/");
-    const map = await screen.findByTestId("map-stub");
+    const map = await showMap();
     expect(map).toHaveTextContent("ok:3 full:1 empty:1");
     fireEvent.click(screen.getByLabelText("+60"));
     await waitFor(() =>
@@ -60,7 +66,7 @@ describe("routes", () => {
 
   it("map page: at-risk list ranks from the forecast range and opens the station panel", async () => {
     renderAt("/");
-    await screen.findByTestId("map-stub");
+    await showMap();
     fireEvent.click(screen.getByLabelText("+60"));
     const list = await screen.findByRole("heading", { name: "At risk at +60 min" });
     expect(list).toBeInTheDocument();
@@ -84,7 +90,7 @@ describe("routes", () => {
 
   it("map page: station search is the keyboard alternative to the map", async () => {
     renderAt("/");
-    await screen.findByTestId("map-stub");
+    await showMap();
     fireEvent.change(screen.getByLabelText("Search stations"), { target: { value: "grand" } });
     fireEvent.click(await screen.findByRole("button", { name: "GRAND CANAL DOCK" }));
     expect(await screen.findByRole("heading", { name: "GRAND CANAL DOCK" })).toBeInTheDocument();
@@ -92,7 +98,9 @@ describe("routes", () => {
 
   it("station page: tiles, chart table, risk badge, backups and drivers", async () => {
     renderAt("/station/5");
-    expect(await screen.findByRole("heading", { name: "CHARLEMONT PLACE" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "CHARLEMONT PLACE" }, { timeout: 5000 }),
+    ).toBeInTheDocument();
     // Tiles: bikes now, docks now, +60 and +120 (PRD 16.4).
     expect(screen.getByText("likely 17–27 (P10–P90)")).toBeInTheDocument();
     expect(screen.getByText("likely 13–27 (P10–P90)")).toBeInTheDocument();
@@ -167,8 +175,8 @@ describe("routes", () => {
     expect(screen.getByRole("contentinfo")).toHaveTextContent("CC BY 4.0");
   });
 
-  it("renders a 404 page for unknown routes", () => {
+  it("renders a 404 page for unknown routes", async () => {
     renderAt("/nope");
-    expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
   });
 });
