@@ -603,3 +603,44 @@ Mean weekly MAE by quarter of the test week:
 | 2026Q2 | 1.740 | 1.495 | 1.472 | 1.494 |
 
 Hardest week for `lgbm_weekly`: 2025-05-09 (MAE 1.587); easiest: 2025-12-20 (MAE 1.029). Fold dates are in the run's `folds.json` artifact.
+
+## E9 — Rebalancing simulation (SIMULATION, +60, 8 weeks)
+
+MLflow run `1716b5e76b114ef99816baaadb3a2938` · git `e95c28a-dirty` · generated 2026-11-05 03:20 UTC · data 2026-05-05 23:45 → 2026-06-30 23:45 UTC
+
+**This is a simulation, not a measurement and not operator advice (PRD NG2).** Owner decisions 2026-11-05 (PRD 23). Demand is a replay: each station's observed 15-min net change in bikes, with changes in rebalance-flagged buckets removed (no real operator), plus the simulated van moves, clipped at 0 and capacity. A bucket at 0 bikes or at capacity on an open station counts as 15 stockout-minutes. Riders are assumed not to react to the moves, and net change understates real demand (no trip data). Vans carry 20 bikes and make one pickup -> dropoff move per hour, 06:00-22:00 Europe/Dublin; travel is ignored. Greedy policy: serve the station with the lowest expected bikes in an hour (<= 2) and the fullest (>= capacity - 2), bringing both towards half full. `persistence` plans on the current simulated state; `lgbm_global` adds its P50 forecast change over the next hour, from E1 run `e4819616d7034b90abcb3adc882313da` (same folds; nothing retrained). 115 stations; LightGBM fell back to persistence for 0.6% of open-station decisions (no scored E1 row).
+
+Mean per test week (8 weeks):
+
+| policy | vans | empty min | full min | stockout min | moves | bikes moved | clipped bikes |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| observed (real operator, not simulated) | 0 | 121729 | 40594 | 162322 | 0 | 0 | — |
+| no_action | 0 | 144861 | 59721 | 204581 | 0 | 0 | 3066 |
+| persistence | 1 | 86518 | 33786 | 120304 | 112 | 1356 | 2152 |
+| persistence | 2 | 48326 | 17385 | 65711 | 211 | 2504 | 1493 |
+| persistence | 4 | 25275 | 8653 | 33928 | 340 | 3788 | 928 |
+| lgbm_global | 1 | 74338 | 25185 | 99523 | 112 | 1426 | 1490 |
+| lgbm_global | 2 | 42782 | 11861 | 54643 | 210 | 2495 | 907 |
+| lgbm_global | 4 | 21193 | 6051 | 27244 | 322 | 3524 | 502 |
+
+Objective: stockout-minutes avoided against no action, minus λ x moves (λ in stockout-minutes per move). Mean per week; ± is the std of avoided minutes over weeks.
+
+| policy | vans | avoided | ± | avoided per move | λ = 0 | λ = 5 | λ = 10 | λ = 20 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| persistence | 1 | 84278 | 13119 | 754 | 84278 | 83719 | 83160 | 82042 |
+| lgbm_global | 1 | 105058 | 17121 | 940 | 105058 | 104499 | 103941 | 102823 |
+| persistence | 2 | 138870 | 12177 | 658 | 138870 | 137815 | 136760 | 134650 |
+| lgbm_global | 2 | 149938 | 15357 | 714 | 149938 | 148889 | 147839 | 145741 |
+| persistence | 4 | 170653 | 12334 | 502 | 170653 | 168952 | 167252 | 163851 |
+| lgbm_global | 4 | 177338 | 12414 | 551 | 177338 | 175728 | 174118 | 170898 |
+
+At λ = 20 the move cost is at most 4.0% of the minutes avoided, so the ranking does not depend on λ in this range. The minutes avoided per move are large because in a replay a delivered bike stays until the observed net change drains it; riders do not take the extra bikes. Read them as an upper bound on what a move achieves, and compare policies rather than trusting the absolute values.
+
+LightGBM-planned vs persistence-planned, same fleet (stockout-minutes per week):
+
+| vans | weeks LightGBM better | weeks worse | mean minutes saved |
+|---:|---:|---:|---:|
+| 1 | 8/8 | 0 | +20781 |
+| 2 | 8/8 | 0 | +11068 |
+| 4 | 8/8 | 0 | +6684 |
+
