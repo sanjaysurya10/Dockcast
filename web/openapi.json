@@ -228,6 +228,11 @@
       "City": {
         "description": "One city.",
         "properties": {
+          "attribution": {
+            "default": "",
+            "title": "Attribution",
+            "type": "string"
+          },
           "centre_lat": {
             "title": "Centre Lat",
             "type": "number"
@@ -244,8 +249,28 @@
             "title": "Default Zoom",
             "type": "number"
           },
+          "forecasts": {
+            "default": true,
+            "title": "Forecasts",
+            "type": "boolean"
+          },
+          "licence_name": {
+            "default": "",
+            "title": "Licence Name",
+            "type": "string"
+          },
+          "licence_url": {
+            "default": "",
+            "title": "Licence Url",
+            "type": "string"
+          },
           "name": {
             "title": "Name",
+            "type": "string"
+          },
+          "source_url": {
+            "default": "",
+            "title": "Source Url",
             "type": "string"
           },
           "timezone": {
@@ -1289,7 +1314,7 @@
     },
     "/v1/cities": {
       "get": {
-        "description": "Cities with centre and zoom.",
+        "description": "Cities with centre, zoom, attribution and whether they have forecasts.",
         "operationId": "list_cities_v1_cities_get",
         "responses": {
           "200": {

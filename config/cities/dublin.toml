@@ -15,3 +15,9 @@ ckan_package_url = "https://data.gov.ie/api/3/action/package_show?id=dublinbikes
 weather_station = "Dublin Airport (532)"
 weather_history_url = "https://clidata.met.ie/cli/climate_data/webdata/hly532.csv"
 weather_history_start = "2021-09-30"
+# Generous box around the 115 stations (lon -6.31 to -6.23); checked 2026-11-05.
+bbox = [-6.45, 53.25, -6.10, 53.45]
+attribution = "Dublin City Council / Smart Dublin"
+source_url = "https://data.smartdublin.ie/"
+licence_name = "CC BY 4.0"
+licence_url = "https://creativecommons.org/licenses/by/4.0/"

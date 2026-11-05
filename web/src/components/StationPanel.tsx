@@ -2,18 +2,26 @@ import { Link } from "react-router";
 
 import { ApiError, type Station } from "@/api/client";
 import { useStationForecast } from "@/api/queries";
-import { dublinTime, stationState } from "@/lib/status";
+import { cityTime, stationState } from "@/lib/status";
 
 import { StateBadge } from "./StateBadge";
 
 interface StationPanelProps {
   station: Station;
   onClose: () => void;
+  timeZone?: string;
+  /** The city has live status only: no forecast request and no details page (M20). */
+  liveOnly?: boolean;
 }
 
 /** Side panel for the selected station: now and the three forecast horizons (PRD 16.3 item 5). */
-export function StationPanel({ station, onClose }: StationPanelProps) {
-  const forecast = useStationForecast(station.station_key);
+export function StationPanel({
+  station,
+  onClose,
+  timeZone = "Europe/Dublin",
+  liveOnly = false,
+}: StationPanelProps) {
+  const forecast = useStationForecast(station.station_key, !liveOnly);
   const noForecast = forecast.error instanceof ApiError;
   return (
     <section aria-labelledby="station-panel-heading" className="space-y-4">
@@ -36,11 +44,15 @@ export function StationPanel({ station, onClose }: StationPanelProps) {
         <StateBadge state={stationState(station)} />
         {station.now && (
           <span className="num text-sm">
-            {station.now.bikes} bikes · {station.now.docks} docks · {dublinTime(station.now.observed_at)}
+            {station.now.bikes} bikes · {station.now.docks} docks ·{" "}
+            {cityTime(station.now.observed_at, timeZone)}
           </span>
         )}
       </div>
-      {forecast.isPending && (
+      {liveOnly && (
+        <p className="text-sm text-muted">Live status only: no forecasts for this city.</p>
+      )}
+      {!liveOnly && forecast.isPending && (
         <p role="status" className="text-sm text-muted">
           Loading forecast…
         </p>
@@ -66,7 +78,7 @@ export function StationPanel({ station, onClose }: StationPanelProps) {
             {forecast.data.forecasts.map((row) => (
               <tr key={row.horizon_min}>
                 <th scope="row" className="num py-1 text-left font-normal">
-                  +{row.horizon_min} ({dublinTime(row.target_ts)})
+                  +{row.horizon_min} ({cityTime(row.target_ts, timeZone)})
                 </th>
                 <td className="num py-1 text-right">{row.bikes_p50.toFixed(1)}</td>
                 <td className="num py-1 text-right text-muted">
@@ -77,12 +89,14 @@ export function StationPanel({ station, onClose }: StationPanelProps) {
           </tbody>
         </table>
       )}
-      <Link
-        to={`/station/${station.station_key}`}
-        className="inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-medium text-surface"
-      >
-        Open details
-      </Link>
+      {!liveOnly && (
+        <Link
+          to={`/station/${station.station_key}`}
+          className="inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-sm font-medium text-surface"
+        >
+          Open details
+        </Link>
+      )}
     </section>
   );
 }

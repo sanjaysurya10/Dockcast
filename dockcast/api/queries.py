@@ -12,6 +12,8 @@ LATEST_STATUS = text(
     FROM station_status_raw
     WHERE observed_at > now() - INTERVAL '1 day'
       AND (CAST(:station_key AS bigint) IS NULL OR station_key = :station_key)
+      AND (CAST(:city AS text) IS NULL
+           OR station_key IN (SELECT station_key FROM stations WHERE city_code = :city))
     ORDER BY station_key, observed_at DESC
     """
 )
@@ -70,7 +72,7 @@ def stations(
             "observed_at": _utc(r["observed_at"]),
             "is_renting": r["is_renting"],
         }
-        for r in conn.execute(LATEST_STATUS, {"station_key": station_key}).mappings()
+        for r in conn.execute(LATEST_STATUS, {"station_key": station_key, "city": city}).mappings()
     }
     return [{**r, "now": status.get(r["station_key"]), "risk": None} for r in rows]
 
@@ -90,8 +92,17 @@ def city_forecast(conn: Connection, city: str) -> list[dict[str, Any]]:
 
 
 def health(conn: Connection) -> tuple[datetime | None, datetime | None]:
-    """Newest collector run start and newest forecast issue time."""
-    run = conn.execute(text("SELECT max(started_at) FROM collector_runs")).scalar()
+    """Collector freshness of the stalest city, and the newest forecast issue time.
+
+    Each city's newest run is taken, then the oldest of those, so one healthy collector does
+    not hide another city's outage (M20).
+    """
+    run = conn.execute(
+        text(
+            "SELECT min(last_run) FROM (SELECT max(started_at) AS last_run "
+            "FROM collector_runs GROUP BY city_code) per_city"
+        )
+    ).scalar()
     issued = conn.execute(text("SELECT max(issued_at) FROM forecasts")).scalar()
     return _utc(run), _utc(issued)
 
@@ -237,13 +248,13 @@ def backtest(
     return [dict(r) for r in conn.execute(BACKTEST, params).mappings()]
 
 
-def collector_polls(conn: Connection, days: int) -> int:
-    """Successful collector polls in the last ``days`` days."""
+def collector_polls(conn: Connection, days: int, city: str) -> int:
+    """Successful collector polls for one city in the last ``days`` days."""
     sql = text(
-        "SELECT count(*) FROM collector_runs "
-        "WHERE status = 'ok' AND started_at > now() - make_interval(days => :days)"
+        "SELECT count(*) FROM collector_runs WHERE status = 'ok' AND city_code = :city "
+        "AND started_at > now() - make_interval(days => :days)"
     )
-    return int(conn.execute(sql, {"days": days}).scalar() or 0)
+    return int(conn.execute(sql, {"days": days, "city": city}).scalar() or 0)
 
 
 def stations_modelled(conn: Connection) -> int:

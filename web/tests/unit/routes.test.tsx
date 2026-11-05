@@ -173,6 +173,28 @@ describe("routes", () => {
     renderAt("/about");
     expect(await screen.findAllByText(/Smart Dublin/)).not.toHaveLength(0);
     expect(screen.getByRole("contentinfo")).toHaveTextContent("CC BY 4.0");
+    await waitFor(() =>
+      expect(screen.getByRole("contentinfo")).toHaveTextContent(
+        "JCDecaux (Vélo'v) (Licence Ouverte (Etalab))",
+      ),
+    );
+  });
+
+  it("map page: a live-only city shows current state without forecast tools", async () => {
+    renderAt("/?city=lyon");
+    expect(
+      await screen.findByText("Live status only: no forecasts for Lyon."),
+    ).toBeInTheDocument();
+    expect(await showMap()).toHaveTextContent("ok:1");
+    expect(screen.queryByLabelText("+60")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("City")).toHaveValue("lyon");
+    const requested = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(requested.some((url) => url.includes("/v1/cities/lyon/risk"))).toBe(false);
+    fireEvent.change(screen.getByLabelText("Search stations"), { target: { value: "rouv" } });
+    fireEvent.click(await screen.findByRole("button", { name: "ROUVILLE" }));
+    expect(await screen.findByText("Live status only: no forecasts for this city.")).toBeInTheDocument();
+    expect(screen.getByText(/6 bikes · 10 docks · 13:24/)).toBeInTheDocument(); // Paris time
+    expect(screen.queryByRole("link", { name: "Open details" })).not.toBeInTheDocument();
   });
 
   it("renders a 404 page for unknown routes", async () => {

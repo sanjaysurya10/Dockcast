@@ -227,18 +227,25 @@ def incremental_start(engine: Engine, lookback: timedelta = timedelta(hours=2)) 
     return None if newest is None else newest - lookback
 
 
-def resample_per_station(engine: Engine, since: datetime | None = None) -> int:
+def resample_per_station(
+    engine: Engine, since: datetime | None = None, city: str | None = None
+) -> int:
     """Run :func:`resample` one station at a time to keep sort/temp space small.
 
     Args:
         engine: Database engine.
         since: As in :func:`resample`; None rebuilds everything (table truncated first).
+        city: Only this city's stations (None: all). Live-only cities have no 15-min states.
 
     Returns:
         Total buckets written.
     """
+    query = text(
+        "SELECT station_key FROM stations "
+        "WHERE CAST(:city AS text) IS NULL OR city_code = :city ORDER BY 1"
+    )
     with engine.begin() as conn:
-        keys = [row[0] for row in conn.execute(text("SELECT station_key FROM stations ORDER BY 1"))]
+        keys = [row[0] for row in conn.execute(query, {"city": city})]
         if since is None:
             conn.execute(text("TRUNCATE station_status_15m"))
     total = 0

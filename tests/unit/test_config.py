@@ -4,6 +4,7 @@ import pytest
 
 from dockcast.config import (
     EnvSettings,
+    city_codes,
     get_env_settings,
     load_city_config,
     load_project_config,
@@ -25,6 +26,18 @@ def test_dublin_city_config_loads() -> None:
     city = load_city_config("dublin")
     assert city.city_code == "dublin"
     assert city.timezone == "Europe/Dublin"
+
+
+def test_lyon_is_a_live_only_second_city() -> None:
+    assert city_codes() == ["dublin", "lyon"]
+    lyon = load_city_config("lyon")
+    assert (lyon.timezone, lyon.forecasts, lyon.raw_live_days) == ("Europe/Paris", False, 0)
+    assert lyon.contains(45.769684, 4.824607)  # ROUVILLE, a real station
+    assert not lyon.contains(0.0, 0.0)  # blank feed entry
+    assert not lyon.contains(48.799974, 1.946202)  # test platform near Paris
+    dublin = load_city_config("dublin")
+    assert dublin.forecasts and dublin.raw_live_days is None
+    assert dublin.contains(53.340927, -6.262501) and not dublin.contains(45.77, 4.82)
 
 
 def test_env_overrides_gbfs_url(monkeypatch: pytest.MonkeyPatch) -> None:

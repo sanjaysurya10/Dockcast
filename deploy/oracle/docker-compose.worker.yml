@@ -17,6 +17,21 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  # Second city (M20, owner decision 2026-11-05): Lyon Vélo'v, live status only. Same image;
+  # only CITY differs. GBFS_ROOT_URL is blanked so an override meant for Dublin cannot leak in.
+  collector-lyon:
+    build:
+      context: ../..
+    env_file: .env
+    environment:
+      CITY: lyon
+      GBFS_ROOT_URL: ""
+      DATA_DIR: /app/data
+    volumes:
+      - /var/lib/dockcast/data:/app/data
+    restart: unless-stopped
+    logging: *logging
+
   # Met Éireann point forecast for the city centre, hourly at :20 (PRD 9.5; owner decision
   # 2026-10-25 to start collecting during M2). Same image as the collector.
   weather-forecast:

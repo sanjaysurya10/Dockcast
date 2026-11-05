@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 
 import type { RiskStation } from "@/api/client";
 import { useCities, useCityRisk, useNetFlow, useStations } from "@/api/queries";
@@ -50,8 +51,15 @@ function useMapStart(wide: boolean): [boolean, () => void] {
 
 /** The command center (PRD 16.3): globe map, horizon toggle, at-risk panel, station panel. */
 export function MapPage() {
-  const stations = useStations();
+  const [params, setParams] = useSearchParams();
+  const cityCode = params.get("city") ?? CITY;
   const cities = useCities();
+  const city = cities.data?.find((item) => item.city_code === cityCode);
+  // M20: a second city may have live status only (no model, forecasts or 15-min states).
+  // Until the city list arrives, only the default city is assumed to have forecasts.
+  const hasForecasts = city ? city.forecasts : cityCode === CITY;
+  const liveOnly = city?.forecasts === false;
+  const stations = useStations(cityCode);
   const [horizon, setHorizon] = useState<Horizon>("now");
   const [selectedKey, setSelectedKey] = useState<number | null>(null);
   const [focus, setFocus] = useState<MapFocus | null>(null);
@@ -68,10 +76,11 @@ export function MapPage() {
     horizon === "now" ? AUTOPILOT_DEFAULT_WINDOW : horizon,
     "empty",
     ALL_STATIONS,
+    cityCode,
+    hasForecasts,
   );
-  const netFlow = useNetFlow(netFlowOn);
+  const netFlow = useNetFlow(netFlowOn && hasForecasts, AUTOPILOT_DEFAULT_WINDOW, cityCode);
 
-  const city = cities.data?.find((item) => item.city_code === CITY);
   const centre = useMemo(
     () =>
       city
@@ -127,6 +136,17 @@ export function MapPage() {
   }, []);
   const autopilot = useAutopilot({ stops, reducedMotion, onVisit: visit });
 
+  const switchCity = (code: string) => {
+    const picked = cities.data?.find((item) => item.city_code === code);
+    if (!picked) return;
+    autopilot.stop();
+    setSelectedKey(null);
+    setHorizon("now");
+    setNetFlowOn(false);
+    setParams(code === CITY ? {} : { city: code });
+    setFocus({ lat: picked.centre_lat, lon: picked.centre_lon, zoom: picked.default_zoom });
+  };
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
       <h1 className="sr-only">{city?.name ?? "Dublin"} bike availability map</h1>
@@ -166,25 +186,18 @@ export function MapPage() {
           </div>
         )}
         <div className="pointer-events-none absolute left-3 right-14 top-3 flex flex-wrap items-start gap-2">
-          <div className="pointer-events-auto">
-            <HorizonToggle value={horizon} onChange={setHorizon} />
-          </div>
+          {!liveOnly && (
+            <div className="pointer-events-auto">
+              <HorizonToggle value={horizon} onChange={setHorizon} />
+            </div>
+          )}
           {cities.data && (
             <label className="pointer-events-auto flex items-center gap-2 rounded-control border border-line bg-surface px-2 text-sm shadow-sm">
               <span className="text-muted">City</span>
               <select
                 className="min-h-11 bg-transparent"
-                value={CITY}
-                onChange={(event) => {
-                  const picked = cities.data.find((c) => c.city_code === event.target.value);
-                  if (picked) {
-                    setFocus({
-                      lat: picked.centre_lat,
-                      lon: picked.centre_lon,
-                      zoom: picked.default_zoom,
-                    });
-                  }
-                }}
+                value={cityCode}
+                onChange={(event) => switchCity(event.target.value)}
               >
                 {cities.data.map((option) => (
                   <option key={option.city_code} value={option.city_code}>
@@ -194,7 +207,15 @@ export function MapPage() {
               </select>
             </label>
           )}
-          <div className="pointer-events-auto">
+          {liveOnly && (
+            <p
+              role="status"
+              className="pointer-events-auto rounded-control border border-line bg-surface px-3 py-2 text-sm shadow-sm"
+            >
+              Live status only: no forecasts for {city?.name}.
+            </p>
+          )}
+          <div className={liveOnly ? "hidden" : "pointer-events-auto"}>
             <MapTools
               netFlowOn={netFlowOn}
               onNetFlow={(on) => {
@@ -275,7 +296,12 @@ export function MapPage() {
         {stations.isError && <ErrorMessage error={stations.error} label="stations" />}
         <StationSearch stations={stations.data ?? []} onSelect={selectFromList} />
         {selected ? (
-          <StationPanel station={selected} onClose={() => setSelectedKey(null)} />
+          <StationPanel
+            station={selected}
+            onClose={() => setSelectedKey(null)}
+            timeZone={city?.timezone}
+            liveOnly={liveOnly}
+          />
         ) : (
           <RiskList horizon={horizon} stations={stations.data ?? []} onSelect={selectFromList} />
         )}

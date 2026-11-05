@@ -147,6 +147,31 @@ class CityConfig(BaseModel):
     weather_station: str = ""
     weather_history_url: str = ""
     weather_history_start: str = "2021-09-30"
+    # (min_lon, min_lat, max_lon, max_lat); feed stations outside it are not collected.
+    bbox: tuple[float, float, float, float] | None = None
+    # Days of live raw rows kept in the hosted DB; None uses [retention] raw_live_days.
+    raw_live_days: int | None = Field(default=None, ge=0)
+    # False: live status only (no model, forecasts or 15-min states for this city).
+    forecasts: bool = True
+    attribution: str = ""
+    source_url: str = ""
+    licence_name: str = ""
+    licence_url: str = ""
+
+    def contains(self, lat: float, lon: float) -> bool:
+        """Whether a point lies inside ``bbox`` (always True without a bbox).
+
+        Args:
+            lat: Latitude.
+            lon: Longitude.
+
+        Returns:
+            True if the point is inside the box.
+        """
+        if self.bbox is None:
+            return True
+        min_lon, min_lat, max_lon, max_lat = self.bbox
+        return min_lon <= lon <= max_lon and min_lat <= lat <= max_lat
 
 
 def _read_toml(path: Path) -> dict[str, object]:
@@ -181,6 +206,18 @@ def load_city_config(city: str, config_dir: Path = CONFIG_DIR / "cities") -> Cit
     if env_url:
         city_config = city_config.model_copy(update={"gbfs_root_url": env_url})
     return city_config
+
+
+def city_codes(config_dir: Path = CONFIG_DIR / "cities") -> list[str]:
+    """Codes of every configured city (one ``<city>.toml`` each).
+
+    Args:
+        config_dir: Directory holding the city files.
+
+    Returns:
+        Sorted city codes.
+    """
+    return sorted(path.stem for path in config_dir.glob("*.toml"))
 
 
 @lru_cache(maxsize=1)

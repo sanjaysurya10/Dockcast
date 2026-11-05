@@ -8,6 +8,10 @@ export function AboutPage() {
         on station history. They are checked with a rolling-origin backtest, so every number on the
         Accuracy page comes from data the model had not seen.
       </p>
+      <p>
+        The map also shows Lyon's Vélo'v stations to prove the multi-city design. Lyon has live
+        status only: no model, no forecasts and no net flow.
+      </p>
       <h2 className="text-lg font-semibold">Limitations</h2>
       <ul className="list-disc space-y-1 pl-5">
         <li>Forecasts are estimates, not guarantees of availability.</li>
@@ -23,6 +27,13 @@ export function AboutPage() {
             CC BY 4.0
           </a>
           .
+        </li>
+        <li>
+          Lyon station status: JCDecaux (Vélo'v), licensed{" "}
+          <a className="underline" href="https://developer.jcdecaux.com/files/Open-Licence-fr.pdf">
+            Licence Ouverte (Etalab)
+          </a>
+          . Each station shows the time of its latest update.
         </li>
         <li>Weather: Met Éireann, licensed CC BY 4.0.</li>
       </ul>

@@ -97,6 +97,65 @@ def test_cycle_skips_when_live_data_is_stale(db_engine: Engine, bundle: Bundle) 
         assert conn.execute(text("SELECT count(*) FROM forecasts")).scalar() == 0
 
 
+def test_cycle_serves_only_the_modelled_city(db_engine: Engine, bundle: Bundle) -> None:
+    keys = seed_live(db_engine, NOW - timedelta(minutes=1, seconds=30))
+    lyon = CITY.model_copy(update={"city_code": "lyon", "name": "Lyon", "forecasts": False})
+    with Session(db_engine) as session:
+        ensure_city(session, lyon)
+        lyon_keys = upsert_stations(
+            session, "lyon", [StationRecord("1024", "ROUVILLE", 45.77, 4.82, 17)], NOW
+        )
+        insert_status_rows(
+            session,
+            [
+                {
+                    "station_key": lyon_keys["1024"],
+                    "observed_at": NOW - timedelta(minutes=5 * i),
+                    "last_reported": None,
+                    "bikes_available": 6,
+                    "docks_available": 10,
+                    "is_renting": True,
+                    "is_returning": True,
+                    "source": "live",
+                }
+                for i in range(24)
+            ],
+        )
+        session.commit()
+    register(db_engine, bundle)
+    assert run_cycle(db_engine, bundle, NOW) == 6  # Dublin's two stations x three horizons
+    with db_engine.connect() as conn:
+        forecast_keys = set(conn.execute(text("SELECT station_key FROM forecasts")).scalars())
+        state_keys = set(conn.execute(text("SELECT station_key FROM station_status_15m")).scalars())
+    assert forecast_keys == state_keys == set(keys.values())
+
+
+def test_cycle_skips_when_only_another_city_is_fresh(db_engine: Engine, bundle: Bundle) -> None:
+    seed_live(db_engine, NOW - timedelta(minutes=45), hours=2)
+    lyon = CITY.model_copy(update={"city_code": "lyon", "name": "Lyon"})
+    with Session(db_engine) as session:
+        ensure_city(session, lyon)
+        key = upsert_stations(session, "lyon", [StationRecord("1", "X", 45.77, 4.82, 17)], NOW)
+        insert_status_rows(
+            session,
+            [
+                {
+                    "station_key": key["1"],
+                    "observed_at": NOW - timedelta(minutes=1),
+                    "last_reported": None,
+                    "bikes_available": 6,
+                    "docks_available": 10,
+                    "is_renting": True,
+                    "is_returning": True,
+                    "source": "live",
+                }
+            ],
+        )
+        session.commit()
+    register(db_engine, bundle)
+    assert run_cycle(db_engine, bundle, NOW) == 0  # Dublin is stale; Lyon's freshness is not used
+
+
 def test_new_bundle_takes_over_champion_flag(db_engine: Engine, tmp_path: Path) -> None:
     seed_live(db_engine, NOW, hours=1)
     register(db_engine, Bundle(tiny_bundle(tmp_path / "a", bundle_id="old")))

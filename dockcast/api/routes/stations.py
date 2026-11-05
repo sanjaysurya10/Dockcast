@@ -26,7 +26,7 @@ from dockcast.api.schemas import (
     StationHistory,
     Status,
 )
-from dockcast.config import load_project_config
+from dockcast.config import city_codes, load_city_config, load_project_config
 from dockcast.ingest.historical.reconcile import haversine_m
 
 router = APIRouter()
@@ -37,16 +37,27 @@ def _engine(request: Request) -> Engine:
     return engine
 
 
+def _city_config(city_code: str) -> dict[str, Any]:
+    """Attribution and forecast flag from ``config/cities/<city>.toml`` (empty if absent)."""
+    if city_code not in city_codes():
+        return {}
+    city = load_city_config(city_code)
+    return city.model_dump(
+        include={"forecasts", "attribution", "source_url", "licence_name", "licence_url"}
+    )
+
+
 def _cache(response: Response, seconds: int) -> None:
     response.headers["Cache-Control"] = f"public, max-age={seconds}"
 
 
 @router.get("/cities", response_model=list[City])
 def list_cities(request: Request, response: Response) -> list[City]:
-    """Cities with centre and zoom."""
+    """Cities with centre, zoom, attribution and whether they have forecasts."""
     _cache(response, 3600)
     with _engine(request).connect() as conn:
-        return [City.model_validate(c) for c in queries.cities(conn)]
+        rows = queries.cities(conn)
+    return [City.model_validate({**_city_config(row["city_code"]), **row}) for row in rows]
 
 
 @router.get("/cities/{city}/stations", response_model=list[Station])

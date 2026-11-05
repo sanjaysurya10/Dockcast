@@ -95,6 +95,42 @@ def test_prune_refuses_without_matching_archive(db_engine: Engine, tmp_path: Pat
     assert _count(db_engine) == 5
 
 
+def test_raw_rows_are_archived_and_pruned_per_city(db_engine: Engine, tmp_path: Path) -> None:
+    _seed(db_engine)
+    when = datetime(2026, 10, 15, 12, 0, tzinfo=UTC)
+    lyon = CITY.model_copy(update={"city_code": "lyon", "name": "Lyon"})
+    with Session(db_engine) as session:
+        ensure_city(session, lyon)
+        keys = upsert_stations(
+            session, "lyon", [StationRecord("1024", "ROUVILLE", 45.77, 4.82, 17)], when
+        )
+        insert_status_rows(
+            session,
+            [
+                {
+                    "station_key": keys["1024"],
+                    "observed_at": when,
+                    "last_reported": None,
+                    "bikes_available": 6,
+                    "docks_available": 10,
+                    "is_renting": True,
+                    "is_returning": True,
+                    "source": "live",
+                }
+            ],
+        )
+        session.commit()
+    cutoff = datetime(2026, 10, 16, tzinfo=UTC)
+    assert days_before(db_engine, cutoff, city="lyon") == [DAY]
+    assert export_day(db_engine, DAY, tmp_path, city="lyon") == 1
+    frame = pd.read_parquet(archive_path(tmp_path, DAY, city="lyon"))
+    assert list(frame["source_id"]) == ["1024"] and set(frame["city_code"]) == {"lyon"}
+    assert prune_day(db_engine, DAY, tmp_path, city="lyon") == 1
+    assert _count(db_engine) == 4  # all four Dublin rows remain
+    assert days_before(db_engine, cutoff, city="lyon") == []
+    assert days_before(db_engine, cutoff, city="dublin") == [DAY]
+
+
 def test_forecasts_are_archived_and_pruned_by_issue_day(db_engine: Engine, tmp_path: Path) -> None:
     key = _seed(db_engine)
     issued = [datetime(2026, 10, 15, 23, 45, tzinfo=UTC), datetime(2026, 10, 16, 0, 0, tzinfo=UTC)]

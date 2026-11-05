@@ -52,6 +52,11 @@ export const STATIONS: Station[] = [
   station(68, "GRAND CANAL DOCK", 40, 53.342638, -6.238695, 33, 7),
 ];
 
+/** Lyon (M20, live only): ROUVILLE from the Vélo'v feed on 2026-11-05; the key is illustrative. */
+export const LYON_STATIONS: Station[] = [
+  station(9001, "ROUVILLE", 17, 45.769684, 4.824607, 6, 10),
+];
+
 export const FORECAST_5: StationForecast = {
   station_key: 5,
   name: "CHARLEMONT PLACE",
@@ -195,6 +200,24 @@ export const CITIES: City[] = [
     centre_lat: 53.3473,
     centre_lon: -6.2591,
     default_zoom: 13,
+    forecasts: true,
+    attribution: "Dublin City Council / Smart Dublin",
+    source_url: "https://data.smartdublin.ie/",
+    licence_name: "CC BY 4.0",
+    licence_url: "https://creativecommons.org/licenses/by/4.0/",
+  },
+  {
+    city_code: "lyon",
+    name: "Lyon",
+    timezone: "Europe/Paris",
+    centre_lat: 45.7578,
+    centre_lon: 4.832,
+    default_zoom: 12.5,
+    forecasts: false,
+    attribution: "JCDecaux (Vélo'v)",
+    source_url: "https://developer.jcdecaux.com/",
+    licence_name: "Licence Ouverte (Etalab)",
+    licence_url: "https://developer.jcdecaux.com/files/Open-Licence-fr.pdf",
   },
 ];
 
@@ -363,6 +386,7 @@ export function mockResponse(url: string, now: Date = new Date()): { status: num
     return { status: 200, body };
   }
   if (path === "/v1/cities/dublin/stations") return { status: 200, body: STATIONS };
+  if (path === "/v1/cities/lyon/stations") return { status: 200, body: LYON_STATIONS };
   if (path === "/v1/cities/dublin/netflow") return { status: 200, body: NET_FLOW };
   if (path === "/v1/stations/5/forecast") return { status: 200, body: FORECAST_5 };
   if (path === "/v1/model/summary") return { status: 200, body: MODEL_SUMMARY };

@@ -74,21 +74,25 @@ def register(engine: Engine, bundle: Bundle) -> None:
         conn.execute(stmt)
 
 
-def newest_live(engine: Engine) -> datetime | None:
-    """Newest live observation time."""
+def newest_live(engine: Engine, city: str) -> datetime | None:
+    """Newest live observation time of one city's stations."""
+    query = text(
+        "SELECT max(observed_at) FROM station_status_raw WHERE source = 'live' "
+        "AND station_key IN (SELECT station_key FROM stations WHERE city_code = :city)"
+    )
     with engine.connect() as conn:
-        value = conn.execute(
-            text("SELECT max(observed_at) FROM station_status_raw WHERE source = 'live'")
-        ).scalar()
+        value = conn.execute(query, {"city": city}).scalar()
     return None if value is None else value.astimezone(UTC)
 
 
-def serving_inputs(engine: Engine) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Active stations (``station_key, source_id, lat, lon``) and ``calendar_days``."""
+def serving_inputs(engine: Engine, city: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """A city's active stations (``station_key, source_id, lat, lon``) and ``calendar_days``."""
+    query = text(
+        "SELECT station_key, source_id, lat, lon FROM stations "
+        "WHERE is_active AND city_code = :city"
+    )
     with engine.connect() as conn:
-        stations = pd.read_sql(
-            text("SELECT station_key, source_id, lat, lon FROM stations WHERE is_active"), conn
-        )
+        stations = pd.read_sql(query, conn, params={"city": city})
         calendar = pd.read_sql(
             text("SELECT date, is_public_holiday, is_school_term, is_uni_term FROM calendar_days"),
             conn,
@@ -202,13 +206,15 @@ def run_cycle(engine: Engine, bundle: Bundle, now: datetime) -> int:
         Forecast rows written (0 when skipped as stale).
     """
     issued = floor_to_grid(now)
-    resample_per_station(engine, incremental_start(engine))
-    newest = newest_live(engine)
+    # Only the modelled city (CITY); live-only cities such as Lyon get no states or forecasts.
+    city = get_env_settings().city
+    resample_per_station(engine, incremental_start(engine), city)
+    newest = newest_live(engine, city)
     stale_after = timedelta(minutes=load_project_config().serving.stale_after_min)
     if newest is None or issued - newest > stale_after:
         log.warning("stale_skip", issued_at=issued.isoformat(), newest_live=str(newest))
         return 0
-    stations, calendar = serving_inputs(engine)
+    stations, calendar = serving_inputs(engine, city)
     panel = load_panel(engine, issued - HISTORY, issued)
     with Session(engine) as session:
         gaps = load_gaps(session)

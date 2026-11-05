@@ -97,8 +97,10 @@ def sync_station_information(
     backoff_s: list[float],
     now: datetime,
     sleep: Callable[[float], None] = time.sleep,
-) -> dict[str, str]:
+) -> tuple[dict[str, str], set[str]]:
     """Upsert the city and its stations from the live ``station_information`` feed.
+
+    Stations outside the city's ``bbox`` (test platforms, blank 0,0 entries) are skipped.
 
     Args:
         session: Open session (caller commits).
@@ -109,20 +111,23 @@ def sync_station_information(
         sleep: Sleep function (injected for tests).
 
     Returns:
-        ``{feed_name: url}`` discovered from ``gbfs.json``.
+        ``{feed_name: url}`` discovered from ``gbfs.json`` and the skipped station IDs.
     """
     feeds = parse_feed_urls(fetch_json(client, city.gbfs_root_url, backoff_s, sleep))
-    infos = parse_station_information(
+    listed = parse_station_information(
         fetch_json(client, feeds["station_information"], backoff_s, sleep)
     )
+    infos = [i for i in listed if city.contains(i.lat, i.lon)]
+    skipped = {i.station_id for i in listed} - {i.station_id for i in infos}
     records = [StationRecord(i.station_id, i.name, i.lat, i.lon, i.capacity) for i in infos]
     ensure_city(session, city)
     keys = upsert_stations(session, city.city_code, records, now)
     changed = sum(
         record_capacity(session, keys[i.station_id], now, i.capacity, "live") for i in infos
     )
-    log.info("station_info_synced", stations=len(infos), capacity_changes=changed)
-    return feeds
+    log.info("station_info_synced", stations=len(infos), skipped=sorted(skipped),
+             capacity_changes=changed)  # fmt: skip
+    return feeds, skipped
 
 
 class Collector:
@@ -158,13 +163,14 @@ class Collector:
         self._sleep = sleep
         self._feeds: dict[str, str] = {}
         self._keys: dict[str, int] = {}
+        self._skipped: set[str] = set()
         self._info_refreshed_at: datetime | None = None
 
     def _fetch(self, url: str) -> JsonDict:
         return fetch_json(self._client, url, self._config.retry_backoff_s, self._sleep)
 
     def _refresh_station_info(self, session: Session, now: datetime) -> None:
-        self._feeds = sync_station_information(
+        self._feeds, self._skipped = sync_station_information(
             session, self._client, self._city, self._config.retry_backoff_s, now, self._sleep
         )
         self._keys = station_keys(session, self._city.city_code)
@@ -176,7 +182,7 @@ class Collector:
         return now - self._info_refreshed_at >= timedelta(hours=self._config.station_info_refresh_h)
 
     def _archive(self, doc: JsonDict, observed_at: datetime) -> None:
-        path = archive_path(self._archive_dir, observed_at)
+        path = archive_path(self._archive_dir / self._city.city_code, observed_at)
         path.parent.mkdir(parents=True, exist_ok=True)
         with gzip.open(path, "wt", encoding="utf-8") as fh:
             json.dump(doc, fh)
@@ -205,8 +211,10 @@ class Collector:
                 doc = self._fetch(self._feeds["station_status"])
                 self._archive(doc, started)
                 statuses = parse_station_status(doc)
-                if any(s.station_id not in self._keys for s in statuses):
+                if any(s.station_id not in self._keys.keys() | self._skipped for s in statuses):
                     self._refresh_station_info(session, started)
+                # Stations outside the bbox are neither stored nor counted against "ok".
+                statuses = [s for s in statuses if s.station_id not in self._skipped]
                 rows = status_rows(statuses, self._keys, started)
                 run.rows_written = insert_status_rows(session, rows)
                 run.stations_seen = len(statuses)

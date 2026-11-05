@@ -3,7 +3,7 @@
 Station-level bike availability forecasting for Dublin Bikes: bikes at +30/+60/+120 min with a
 P10-P90 range, and an honest account of where the model is wrong.
 
-Status: **v3** (PRD 17, M0-M9 and M11-M19; M10 event classifiers wait for 12 weeks of collector
+Status: **v3** (PRD 17, M0-M9 and M11-M20; M10 event classifiers wait for 12 weeks of collector
 data). Live at https://dockcast.pages.dev, with the API at https://143-47-249-111.sslip.io.
 A collector and a 15-min forecast job run in the cloud. Every number below is copied from a
 generated report and carries its MLflow run ID; nothing is hand-typed.
@@ -111,6 +111,22 @@ all 115 stations.
   net change drains it, so 502 to 940 minutes are avoided per move, and λ up to 20 minutes per
   move does not change the ranking.
 
+## Second city: Lyon (M20, live status only)
+
+Lyon's Vélo'v system was added as a configuration file, `config/cities/lyon.toml`, with no
+city-specific code. It runs on the same JCDecaux GBFS 2.3 host as Dublin. A second collector
+container polls it every 60 s, and the map's city switch (`/?city=lyon`) shows each station's
+current state. There is no model, forecast or net flow for Lyon: those need history and a
+backtest. What the change added to the shared code:
+
+- a `bbox` per city: the Lyon feed lists a blank station at 0,0 and a test platform near Paris,
+  and both are left out;
+- a retention per city: Lyon keeps only the current UTC day in the hosted database (free-tier
+  size), and older days go to Parquet on R2;
+- the forecast job, resampling and staleness check are limited to the modelled city;
+- `/v1/cities` carries each city's attribution, licence and `forecasts` flag;
+- health reports the stalest city's collector.
+
 ## Site performance
 
 `reports/lighthouse.md`: accessibility 100 on every page, mobile and desktop. Performance is
@@ -133,6 +149,8 @@ pages, the time to run the app's JavaScript on a throttled phone sets the score.
   at +60 (0.013 bikes over a year), but it was measured on the historical feed, not the live one.
 - **New stations.** Station 118 is not in the training set and has no forecast until a retrain.
 - **No trip data.** There are no origin-destination flows; only dock counts are modelled.
+- **Lyon is live only** (M20): no forecasts, net flow or station page. The Nearby page still
+  uses Dublin's stations.
 - Forecasts are estimates, not guarantees of availability.
 
 ## Architecture
@@ -180,6 +198,7 @@ http://localhost:5173 against the local API; `make web-api` regenerates its type
 ## Data
 
 Dublin Bikes data © Dublin City Council / Smart Dublin, CC BY 4.0. Weather data © Met Éireann.
+Lyon Vélo'v data © JCDecaux, Licence Ouverte (Etalab); each station shows its latest update.
 
 ## Licence
 

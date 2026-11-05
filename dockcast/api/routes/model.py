@@ -36,7 +36,8 @@ def model_summary(request: Request, response: Response) -> ModelSummary:
     expected = UPTIME_DAYS * 86_400 // load_project_config().collector.poll_interval_s
     with _engine(request).connect() as conn:
         champions = [ChampionModel.model_validate(c) for c in queries.champions(conn)]
-        polls = queries.collector_polls(conn, UPTIME_DAYS)
+        # Uptime of the modelled city (CITY), not of live-only cities (M20).
+        polls = queries.collector_polls(conn, UPTIME_DAYS, get_env_settings().city)
         modelled = queries.stations_modelled(conn)
     last = max((c.trained_at for c in champions), default=None)
     health = DataHealth(

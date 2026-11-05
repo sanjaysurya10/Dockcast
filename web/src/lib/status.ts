@@ -80,6 +80,18 @@ export function dublinTime(iso: string): string {
   return TIME.format(new Date(iso));
 }
 
+const CITY_TIMES = new Map<string, Intl.DateTimeFormat>();
+
+/** `hh:mm` in a city's own time zone (e.g. Europe/Paris for Lyon). */
+export function cityTime(iso: string, timeZone: string): string {
+  let format = CITY_TIMES.get(timeZone);
+  if (!format) {
+    format = new Intl.DateTimeFormat("en-IE", { timeZone, hour: "2-digit", minute: "2-digit" });
+    CITY_TIMES.set(timeZone, format);
+  }
+  return format.format(new Date(iso));
+}
+
 /** `hh:mm`, or `d Mon, hh:mm` when the time is not on today's Dublin date. */
 export function dublinTimeOrDate(iso: string, nowMs: number = Date.now()): string {
   const when = new Date(iso);

@@ -1,5 +1,41 @@
 # Changelog
 
+## M20 — Second city: Lyon, live status only (2026-11-05)
+
+- **`config/cities/lyon.toml`**: Vélo'v on the same JCDecaux GBFS 2.3 host as Dublin. The feed
+  lists 467 stations; 465 fall inside the bbox. It runs under Licence Ouverte (Etalab), and the
+  owner decided on live status only.
+- **City config:** new `bbox`, `raw_live_days`, `forecasts` and attribution fields. Dublin gains
+  a bbox and its attribution.
+- **Collector:**
+  - skips stations outside the bbox, without counting them against "ok";
+  - writes raw JSON to `raw/gbfs/<city>/…`, so new Dublin files go to `raw/gbfs/dublin/`;
+  - the VM runs a second `collector-lyon` service.
+- **Archive:** raw rows are exported and pruned per city to
+  `station_status_raw/source=live/city=<code>/date=…`. New Dublin days use this path too;
+  earlier R2 files have no `city=` folder. Lyon keeps only the current UTC day hosted (owner
+  decision: at Dublin's 7 days it would add about 730 MB, over the 500 MB free tier).
+- **Forecast job:** resampling, the staleness check and serving inputs are limited to `CITY`.
+  Without this, the Dublin model would have forecast Lyon stations.
+- **API:**
+  - `/v1/cities` adds `forecasts`, `attribution`, `source_url`, `licence_name` and
+    `licence_url`;
+  - latest status is filtered by city;
+  - `/health` reports the stalest city's collector;
+  - model-summary uptime counts the modelled city only.
+- **Web:**
+  - the city switch changes the data (`?city=lyon`), times are shown in each city's time zone,
+    and live-only cities hide the horizons, net flow, autopilot and "Open details";
+  - the footer and About page credit each city's source.
+- **Tests:**
+  - bbox filtering;
+  - per-city archive and prune;
+  - Lyon config;
+  - forecasts and states for the modelled city only;
+  - staleness checked on the modelled city alone;
+  - API fields, filter and health;
+  - the web live-only map.
+
 ## M19 — Rebalancing simulation (2026-11-05)
 
 - **E9 rebalancing simulation** (`dockcast/experiments/e9.py`, `make backtest E=E9`), run

@@ -64,7 +64,26 @@ def test_collector_poll_is_idempotent_and_logged(db_engine: Engine, tmp_path: Pa
     with Session(db_engine) as session:
         assert session.scalar(select(func.count()).select_from(StationStatusRaw)) == 3
         assert session.scalar(select(func.count()).select_from(CollectorRun)) == 2
-    assert (tmp_path / "2026/10/15/1400.json.gz").exists()
+    assert (tmp_path / "dublin/2026/10/15/1400.json.gz").exists()  # one folder per city
+
+
+@respx.mock
+def test_collector_skips_stations_outside_the_city_box(db_engine: Engine, tmp_path: Path) -> None:
+    _mock_gbfs()
+    boxed = CITY.model_copy(update={"bbox": (-6.30, 53.335, -6.20, 53.40)})  # leaves out 118
+    with httpx.Client() as client:
+        collector = Collector(
+            make_session_factory(db_engine),
+            client,
+            boxed,
+            load_project_config().collector,
+            tmp_path,
+            sleep=lambda _: None,
+        )
+        runs = [collector.poll_once(), collector.poll_once()]
+    assert [(r.status, r.stations_seen) for r in runs] == [("ok", 2), ("ok", 2)]
+    with Session(db_engine) as session:
+        assert sorted(session.scalars(select(Station.source_id))) == ["1", "2"]
 
 
 @respx.mock

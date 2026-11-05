@@ -38,3 +38,6 @@ def test_archive_path_is_hive_partitioned() -> None:
     assert archive_path(Path("a"), date(2026, 10, 15)) == Path(
         "a/station_status_raw/source=live/date=2026-10-15/part-0.parquet"
     )
+    assert archive_path(Path("a"), date(2026, 10, 15), city="lyon") == Path(
+        "a/station_status_raw/source=live/city=lyon/date=2026-10-15/part-0.parquet"
+    )

@@ -1,0 +1,22 @@
+# M20 (owner decision 2026-11-05): second city, live status only (no model or forecasts).
+city_code = "lyon"
+name = "Lyon"
+timezone = "Europe/Paris"
+# Place Bellecour, used only for the initial map camera.
+centre_lat = 45.7578
+centre_lon = 4.8320
+default_zoom = 12.5
+# Verified 2026-11-05: Vélo'v, JCDecaux GBFS 2.3 (same host as Dublin), no key, 467 stations.
+gbfs_root_url = "https://api.cyclocity.fr/contracts/lyon/gbfs/gbfs.json"
+# The feed lists a blank station at 0,0 and a test platform near Paris (Plaisir); the box
+# around the other 465 stations (lat 45.69-45.89, lon 4.78-4.97) leaves both out.
+bbox = [4.70, 45.60, 5.05, 45.95]
+# Owner decision 2026-11-05: keep only the current UTC day hosted (free-tier size); older days
+# are exported to Parquet on R2 nightly, then pruned.
+raw_live_days = 0
+forecasts = false
+attribution = "JCDecaux (Vélo'v)"
+source_url = "https://developer.jcdecaux.com/"
+# license_url in the feed's system_information; the PDF is Etalab's Licence Ouverte (Oct 2011).
+licence_name = "Licence Ouverte (Etalab)"
+licence_url = "https://developer.jcdecaux.com/files/Open-Licence-fr.pdf"

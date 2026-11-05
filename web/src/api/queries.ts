@@ -15,7 +15,7 @@ export function useStations(city: string = CITY) {
   });
 }
 
-export function useStationForecast(stationKey: number) {
+export function useStationForecast(stationKey: number, enabled = true) {
   return useQuery({
     queryKey: ["forecast", stationKey],
     queryFn: ({ signal }) =>
@@ -24,7 +24,7 @@ export function useStationForecast(stationKey: number) {
         signal,
       }),
     refetchInterval: 15 * MINUTE,
-    enabled: Number.isInteger(stationKey) && stationKey > 0,
+    enabled: enabled && Number.isInteger(stationKey) && stationKey > 0,
   });
 }
 
@@ -58,6 +58,7 @@ export function useCityRisk(
   kind: "empty" | "full",
   limit: number,
   city: string = CITY,
+  enabled = true,
 ) {
   return useQuery({
     queryKey: ["risk", city, window, kind, limit],
@@ -68,7 +69,7 @@ export function useCityRisk(
         signal,
       }),
     refetchInterval: MINUTE,
-    enabled: window !== null,
+    enabled: enabled && window !== null,
     retry: false,
   });
 }

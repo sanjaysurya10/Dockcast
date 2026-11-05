@@ -56,6 +56,58 @@ def test_cities_and_stations(seeded: tuple[TestClient, dict[str, int]]) -> None:
     assert all(s["risk"] is None for s in stations)  # event models arrive in M10
 
 
+def test_live_only_second_city(
+    seeded: tuple[TestClient, dict[str, int]], db_engine: Engine
+) -> None:
+    client, keys = seeded
+    now = datetime.now(UTC)
+    with db_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO cities (city_code, name, timezone, centre_lat, centre_lon, "
+                "default_zoom) VALUES ('lyon', 'Lyon', 'Europe/Paris', 45.7578, 4.832, 12.5)"
+            )
+        )
+        key = conn.execute(
+            text(
+                "INSERT INTO stations (city_code, source_id, name, lat, lon, capacity, "
+                "is_active, first_seen, last_seen) VALUES ('lyon', '1024', 'ROUVILLE', 45.77, "
+                "4.82, 17, true, :t, :t) RETURNING station_key"
+            ),
+            {"t": now},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO station_status_raw (station_key, observed_at, bikes_available, "
+                "docks_available, is_renting, is_returning, source) "
+                "VALUES (:k, :t, 6, 10, true, true, 'live')"
+            ),
+            {"k": key, "t": now - timedelta(seconds=20)},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO collector_runs (city_code, started_at, finished_at, status) "
+                "VALUES ('lyon', :t, :t, 'ok')"
+            ),
+            {"t": now - timedelta(minutes=30)},
+        )
+    by_code = {c["city_code"]: c for c in client.get("/v1/cities").json()}
+    assert by_code["lyon"]["forecasts"] is False
+    assert by_code["lyon"]["licence_name"] == "Licence Ouverte (Etalab)"
+    assert by_code["dublin"]["forecasts"] is True and by_code["dublin"]["licence_name"] == (
+        "CC BY 4.0"
+    )
+    lyon = client.get("/v1/cities/lyon/stations").json()
+    assert [(s["name"], s["now"]["bikes"]) for s in lyon] == [("ROUVILLE", 6)]
+    dublin = client.get("/v1/cities/dublin/stations").json()
+    assert {s["station_key"] for s in dublin} == set(keys.values())
+    assert client.get("/v1/cities/lyon/risk").json()["error"]["code"] == "forecast_not_found"
+    # Lyon's collector is 30 min behind: health reports the stalest city, not the newest run.
+    assert client.get("/health").json()["status"] == "degraded"
+    summary = client.get("/v1/model/summary").json()["data_health"]
+    assert summary["collector_polls_7d"] == 1  # Dublin's poll only
+
+
 def test_forecast_matches_prd_shape(seeded: tuple[TestClient, dict[str, int]]) -> None:
     client, keys = seeded
     response = client.get(f"/v1/stations/{keys['A']}/forecast")

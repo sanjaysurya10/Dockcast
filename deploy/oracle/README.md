@@ -63,6 +63,7 @@ $C build
 $C run --rm collector alembic current           # expect: 0004 (head) — also proves the URL works
 $C up -d
 $C logs --tail 5 collector                      # expect: poll ... rows=115 status=ok
+$C logs --tail 5 collector-lyon                 # M20: poll ... rows=465 status=ok (live only)
 ```
 
 The container restarts on failure and after a VM reboot (Docker starts on boot).

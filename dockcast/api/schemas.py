@@ -24,6 +24,11 @@ class City(BaseModel):
     centre_lat: float
     centre_lon: float
     default_zoom: float
+    forecasts: bool = True  # False: live status only (M20)
+    attribution: str = ""
+    source_url: str = ""
+    licence_name: str = ""
+    licence_url: str = ""
 
 
 class Status(BaseModel):

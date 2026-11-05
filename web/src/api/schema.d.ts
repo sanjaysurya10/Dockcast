@@ -33,7 +33,7 @@ export interface paths {
         };
         /**
          * List Cities
-         * @description Cities with centre and zoom.
+         * @description Cities with centre, zoom, attribution and whether they have forecasts.
          */
         get: operations["list_cities_v1_cities_get"];
         put?: never;
@@ -361,6 +361,11 @@ export interface components {
          * @description One city.
          */
         City: {
+            /**
+             * Attribution
+             * @default
+             */
+            attribution: string;
             /** Centre Lat */
             centre_lat: number;
             /** Centre Lon */
@@ -369,8 +374,28 @@ export interface components {
             city_code: string;
             /** Default Zoom */
             default_zoom: number;
+            /**
+             * Forecasts
+             * @default true
+             */
+            forecasts: boolean;
+            /**
+             * Licence Name
+             * @default
+             */
+            licence_name: string;
+            /**
+             * Licence Url
+             * @default
+             */
+            licence_url: string;
             /** Name */
             name: string;
+            /**
+             * Source Url
+             * @default
+             */
+            source_url: string;
             /** Timezone */
             timezone: string;
         };

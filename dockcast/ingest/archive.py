@@ -17,7 +17,7 @@ import pandas as pd
 import structlog
 from sqlalchemy import Engine, text
 
-from dockcast.config import get_env_settings, load_project_config
+from dockcast.config import city_codes, get_env_settings, load_city_config, load_project_config
 from dockcast.db.engine import make_engine
 
 log = structlog.get_logger(job="archive")
@@ -53,8 +53,15 @@ FORECASTS = ArchiveTable(
 )
 
 
+CITY_FILTER = (
+    " AND (CAST(:city AS text) IS NULL OR t.station_key IN "
+    "(SELECT station_key FROM stations WHERE city_code = :city))"
+)
+
+
 def _day_filter(spec: ArchiveTable) -> str:
-    return f"{spec.where} AND t.{spec.ts_column} >= :start AND t.{spec.ts_column} < :end"
+    day = f"t.{spec.ts_column} >= :start AND t.{spec.ts_column} < :end"
+    return f"{spec.where} AND {day}{CITY_FILTER}"
 
 
 def day_bounds(day: date) -> tuple[datetime, datetime]:
@@ -84,40 +91,47 @@ def retention_cutoff(now: datetime, keep_days: int) -> datetime:
     return today - timedelta(days=keep_days)
 
 
-def days_before(engine: Engine, cutoff: datetime, spec: ArchiveTable = RAW) -> list[date]:
+def days_before(
+    engine: Engine, cutoff: datetime, spec: ArchiveTable = RAW, city: str | None = None
+) -> list[date]:
     """UTC dates that still hold rows of ``spec`` older than ``cutoff``.
 
     Args:
         engine: Database engine.
         cutoff: Exclusive upper bound.
         spec: Table to look at.
+        city: Only this city's stations (None: all).
 
     Returns:
         Dates in ascending order.
     """
     query = text(
         f"SELECT DISTINCT (t.{spec.ts_column} AT TIME ZONE 'UTC')::date FROM {spec.table} t "
-        f"WHERE {spec.where} AND t.{spec.ts_column} < :cutoff ORDER BY 1"
+        f"WHERE {spec.where} AND t.{spec.ts_column} < :cutoff{CITY_FILTER} ORDER BY 1"
     )
     with engine.connect() as conn:
-        return [row[0] for row in conn.execute(query, {"cutoff": cutoff})]
+        return [row[0] for row in conn.execute(query, {"cutoff": cutoff, "city": city})]
 
 
-def archive_path(root: Path, day: date, spec: ArchiveTable = RAW) -> Path:
-    """Hive-style path: ``<root>/<folder>/date=YYYY-MM-DD/part-0.parquet``.
+def archive_path(root: Path, day: date, spec: ArchiveTable = RAW, city: str | None = None) -> Path:
+    """Hive-style path: ``<root>/<folder>[/city=<code>]/date=YYYY-MM-DD/part-0.parquet``.
 
     Args:
         root: Archive root.
         day: UTC date.
         spec: Archived table.
+        city: City partition (None: all cities in one file).
 
     Returns:
         Parquet file path.
     """
-    return root / spec.folder / f"date={day:%Y-%m-%d}" / "part-0.parquet"
+    folder = root / spec.folder if city is None else root / spec.folder / f"city={city}"
+    return folder / f"date={day:%Y-%m-%d}" / "part-0.parquet"
 
 
-def export_day(engine: Engine, day: date, root: Path, spec: ArchiveTable = RAW) -> int:
+def export_day(
+    engine: Engine, day: date, root: Path, spec: ArchiveTable = RAW, city: str | None = None
+) -> int:
     """Write one UTC day of ``spec`` rows to Parquet (overwrites).
 
     Args:
@@ -125,6 +139,7 @@ def export_day(engine: Engine, day: date, root: Path, spec: ArchiveTable = RAW) 
         day: UTC date.
         root: Archive root.
         spec: Table to export.
+        city: Only this city's stations (None: all).
 
     Returns:
         Number of rows written.
@@ -136,15 +151,19 @@ def export_day(engine: Engine, day: date, root: Path, spec: ArchiveTable = RAW) 
         f"WHERE {_day_filter(spec)} ORDER BY t.station_key, t.{spec.ts_column}"
     )
     with engine.connect() as conn:
-        frame = pd.read_sql(query, conn, params={"start": start, "end": end})
-    path = archive_path(root, day, spec)
+        result = conn.execute(query, {"start": start, "end": end, "city": city})
+        frame = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
+    path = archive_path(root, day, spec, city)
     path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_parquet(path, index=False)
-    log.info("exported", table=spec.table, day=str(day), rows=len(frame), path=str(path))
+    log.info("exported", table=spec.table, city=city, day=str(day), rows=len(frame),
+             path=str(path))  # fmt: skip
     return len(frame)
 
 
-def prune_day(engine: Engine, day: date, root: Path, spec: ArchiveTable = RAW) -> int:
+def prune_day(
+    engine: Engine, day: date, root: Path, spec: ArchiveTable = RAW, city: str | None = None
+) -> int:
     """Delete one day of ``spec`` rows, only if its Parquet file holds the same row count.
 
     Args:
@@ -152,23 +171,25 @@ def prune_day(engine: Engine, day: date, root: Path, spec: ArchiveTable = RAW) -
         day: UTC date.
         root: Archive root.
         spec: Table to prune.
+        city: Only this city's stations (None: all).
 
     Returns:
         Rows deleted (0 if the archive is missing or incomplete).
     """
-    path = archive_path(root, day, spec)
-    params = dict(zip(("start", "end"), day_bounds(day), strict=True))
+    path = archive_path(root, day, spec, city)
+    params: dict[str, object] = dict(zip(("start", "end"), day_bounds(day), strict=True))
+    params["city"] = city
     with engine.begin() as conn:
         count_sql = text(f"SELECT count(*) FROM {spec.table} t WHERE {_day_filter(spec)}")
         in_db = int(conn.execute(count_sql, params).scalar_one())
         archived = len(pd.read_parquet(path, columns=["station_key"])) if path.exists() else -1
         if archived != in_db:
-            log.error("prune_refused", table=spec.table, day=str(day), in_db=in_db,
+            log.error("prune_refused", table=spec.table, city=city, day=str(day), in_db=in_db,
                       archived=archived)  # fmt: skip
             return 0
         delete_sql = text(f"DELETE FROM {spec.table} t WHERE {_day_filter(spec)}")
         deleted = conn.execute(delete_sql, params).rowcount
-    log.info("pruned", table=spec.table, day=str(day), rows=deleted)
+    log.info("pruned", table=spec.table, city=city, day=str(day), rows=deleted)
     return int(deleted)
 
 
@@ -190,12 +211,18 @@ def main(argv: Sequence[str] | None = None) -> None:
     retention = load_project_config().retention
     engine = make_engine()
     now = datetime.now(UTC)
-    for spec, keep in ((RAW, retention.raw_live_days), (FORECASTS, retention.forecasts_days)):
-        for day in days_before(engine, retention_cutoff(now, keep), spec):
+    # Raw rows per city (each city may keep fewer days, M20); forecasts in one file per day.
+    jobs: list[tuple[ArchiveTable, int, str | None]] = []
+    for code in city_codes():
+        keep = load_city_config(code).raw_live_days
+        jobs.append((RAW, retention.raw_live_days if keep is None else keep, code))
+    jobs.append((FORECASTS, retention.forecasts_days, None))
+    for spec, keep, city in jobs:
+        for day in days_before(engine, retention_cutoff(now, keep), spec, city):
             if args.action == "export":
-                export_day(engine, day, root, spec)
+                export_day(engine, day, root, spec, city)
             else:
-                prune_day(engine, day, root, spec)
+                prune_day(engine, day, root, spec, city)
 
 
 if __name__ == "__main__":
