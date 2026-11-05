@@ -1,4 +1,4 @@
-.PHONY: all setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest error-analysis publish-backtest train forecast serve results collect collector-up collector-down collector-logs health lint typecheck pytest test web web-api web-test web-e2e
+.PHONY: all setup db-up db-down backfill backfill-new gaps weather resample capacity calendar eda backtest error-analysis publish-backtest train forecast serve results collect collector-up collector-down collector-logs health lint typecheck pytest test web web-api web-test web-e2e demo-gif
 
 -include .env
 export
@@ -114,5 +114,11 @@ web-test:
 
 web-e2e:
 	cd web && npx playwright test
+
+# README demo: record the live site (or URL=...), then assemble docs/demo.gif.
+demo-gif:
+	rm -rf data/demo_frames
+	cd web && node scripts/demo-frames.mjs ../data/demo_frames $(URL)
+	uv run python -m dockcast.demo_gif data/demo_frames docs/demo.gif
 
 test: lint typecheck pytest web-test
