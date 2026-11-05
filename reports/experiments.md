@@ -568,3 +568,38 @@ Removing one group (ΔMAE = `lgbm_no_<group>` - `lgbm_full`, bikes; positive = t
 | cluster | 1 | 1.561 | +0.119 | +0.074 | +0.006 | +0.008 | +0.001 | +0.000 | -0.001 | -0.003 |
 | cluster | 2 | 1.650 | +0.134 | +0.070 | +0.003 | +0.008 | -0.001 | -0.002 | -0.001 | -0.009 |
 | cluster | 3 | 1.745 | +0.123 | +0.059 | +0.011 | +0.008 | +0.002 | -0.000 | -0.003 | -0.003 |
+
+## E8 — Drift and retraining (+60, 52 weeks)
+
+MLflow run `021e26cd001d459497c1b09834284d81` · git `9d9c518-dirty` · generated 2026-11-05 00:38 UTC · data 2025-05-09 16:30 → 2026-06-30 23:45 UTC
+
+52 gap-free test weeks, 2025-05-09 → 2026-06-30, Format B only (owner decision 2026-11-04: Format A's 30-min grid and the 62-day hole before Format B rule it out). `lgbm_global` with the v1 features, LightGBM defaults and early stopping on the last training week, kept up to date three ways: `lgbm_fixed` is trained once before the first test week (training end 2025-05-09 14:30 UTC) and never updated; `lgbm_weekly` is retrained before every week on all earlier data; `lgbm_rolling12` is retrained before every week on the last 12 weeks only. Each scheme's station x hour encoding comes from the data its model was trained on. Persistence is the MASE denominator. **No weather.** Every model is scored on the same rows.
+
+| model | MAE | ± (weeks) | MASE | coverage P10-P90 | width | rows |
+|---|---:|---:|---:|---:|---:|---:|
+| persistence | 1.692 | 0.199 | 1.000 | — | — | 3939778 |
+| lgbm_fixed | 1.457 | 0.122 | 0.866 | 0.794 | 4.37 | 3939778 |
+| lgbm_weekly | 1.444 | 0.117 | 0.859 | 0.807 | 4.47 | 3939778 |
+| lgbm_rolling12 | 1.469 | 0.111 | 0.875 | 0.768 | 4.35 | 3939778 |
+
+Against weekly retraining (gap = scheme MAE - `lgbm_weekly` MAE; trend = slope of the gap per 4 weeks since the first test week, positive = falling further behind):
+
+| model | MAE first 13 weeks | MAE last 13 weeks | mean gap | weeks better than weekly | trend per 4 weeks |
+|---|---:|---:|---:|---:|---:|
+| persistence | 1.812 | 1.717 | +0.248 | 2/52 | -0.0055 |
+| lgbm_fixed | 1.538 | 1.481 | +0.013 | 3/52 | +0.0012 |
+| lgbm_rolling12 | 1.549 | 1.482 | +0.025 | 1/52 | +0.0003 |
+
+![MAE per test week and the gap to weekly retraining](figures/e8_drift.png)
+
+Mean weekly MAE by quarter of the test week:
+
+| quarter | persistence | lgbm_fixed | lgbm_weekly | lgbm_rolling12 |
+|---|---:|---:|---:|---:|
+| 2025Q2 | 1.832 | 1.536 | 1.531 | 1.550 |
+| 2025Q3 | 1.797 | 1.528 | 1.515 | 1.540 |
+| 2025Q4 | 1.604 | 1.399 | 1.387 | 1.416 |
+| 2026Q1 | 1.548 | 1.359 | 1.352 | 1.382 |
+| 2026Q2 | 1.740 | 1.495 | 1.472 | 1.494 |
+
+Hardest week for `lgbm_weekly`: 2025-05-09 (MAE 1.587); easiest: 2025-12-20 (MAE 1.029). Fold dates are in the run's `folds.json` artifact.
