@@ -1,5 +1,42 @@
 # Changelog
 
+## M18 — Drift study and polish (2026-11-05)
+
+- **E8 drift and retraining** (`dockcast/experiments/e8.py`, `make backtest E=E8`), run
+  `021e26cd001d459497c1b09834284d81`:
+  - setup: +60 only, 52 gap-free Format B test weeks (2025-05-09 to 2026-06-30), no weather;
+  - schemes: trained once (`lgbm_fixed`), weekly retrain on all history (`lgbm_weekly`), and
+    weekly retrain on the last 12 weeks (`lgbm_rolling12`). Each scheme has its own
+    station x hour encoding;
+  - MAE: 1.457 / 1.444 / 1.469 against persistence 1.692. The fixed model trails weekly by
+    0.013 and the gap grows by only 0.0012 per 4 weeks;
+  - report: `reports/experiments.md` and `reports/figures/e8_drift.png`.
+- **E8 implementation:** one feature grid serves all 52 weeks, since features are causal. Hourly
+  training rows are kept as float32. A test proves the slices match `prepare_fold`. Week 52
+  matches the single-week reference run `abca45bb` (weekly 1.542 vs 1.545, rolling12 1.562 vs
+  1.563), with the small difference coming from float32.
+- **Performance:**
+  - every page is a lazy chunk;
+  - the WebGL globe starts after first paint: when the browser is idle on wide screens, and on
+    a "Show map" tap on phones (also when net flow or autopilot is switched on);
+  - Accuracy charts render when scrolled into view, with reserved space and a stable scrollbar
+    gutter;
+  - added `robots.txt`.
+- **Lighthouse** (`reports/lighthouse.md`):
+  - accessibility 100 on every page;
+  - performance at least 90 on 6 of 10 page and form pairs;
+  - map mobile went from 33 to 92, and Accuracy desktop from 70 to 98;
+  - below 90: map desktop 88, and on mobile Accuracy 84, Station 83 and About 89.
+- **Demo GIF:** `make demo-gif` records the live site with Playwright
+  (`web/scripts/demo-frames.mjs`) and assembles `docs/demo.gif` with Pillow
+  (`dockcast/demo_gif.py`), timed at real speed. The GIF is shown in the README.
+- **Tests:**
+  - E8 schemes, the frozen model, window encoding, slice equivalence, the drift summary and the
+    report;
+  - GIF timing;
+  - vitest and Playwright updated for the deferred map, plus a phone test that the globe loads
+    only on request.
+
 ## M17 — Deploy (2026-11-01)
 
 Live since 2026-11-04: frontend https://dockcast.pages.dev, API

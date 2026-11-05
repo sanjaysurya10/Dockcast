@@ -3,10 +3,14 @@
 Station-level bike availability forecasting for Dublin Bikes: bikes at +30/+60/+120 min with a
 P10-P90 range, and an honest account of where the model is wrong.
 
-Status: **v2** (PRD 17, M0-M9 and M11-M12; M10 event classifiers wait for 12 weeks of collector
-data and ship as v2.1). A live collector and a 15-min forecast job run in the cloud; the
-API runs locally (`make serve`). Every number below is copied from a generated report and carries
-its MLflow run ID; nothing is hand-typed.
+Status: **v3** (PRD 17, M0-M9 and M11-M18; M10 event classifiers wait for 12 weeks of collector
+data). Live at https://dockcast.pages.dev, with the API at https://143-47-249-111.sslip.io.
+A collector and a 15-min forecast job run in the cloud. Every number below is copied from a
+generated report and carries its MLflow run ID; nothing is hand-typed.
+
+![DockCast demo: the Dublin map at +60 min, net flow, autopilot and the accuracy page](docs/demo.gif)
+
+Recorded from the live site with `make demo-gif`; the data shown is live, not a sample.
 
 ## Results (E1 backtest)
 
@@ -65,6 +69,34 @@ Same folds and test weeks as E1. Full tables are in `reports/experiments.md` and
   `lgbm_global` at every horizon (PRD 23) because of lower coverage and the extra serving
   pipeline it would need.
 
+## Drift and retraining (E8)
+
+From `reports/experiments.md`, MLflow run `021e26cd001d459497c1b09834284d81`. +60 only, 52
+gap-free test weeks from 2025-05-09 to 2026-06-30, Format B data, **no weather**, every model
+scored on the same 3,939,778 rows. MAE in bikes, mean over weeks.
+
+| scheme | MAE | MASE | P10-P90 coverage |
+|---|---:|---:|---:|
+| persistence | 1.692 | 1.000 | - |
+| trained once before week 1 (`lgbm_fixed`) | 1.457 | 0.866 | 0.794 |
+| retrained weekly on all history (`lgbm_weekly`) | 1.444 | 0.859 | 0.807 |
+| retrained weekly on the last 12 weeks (`lgbm_rolling12`) | 1.469 | 0.875 | 0.768 |
+
+- A model trained once and never updated is only 0.013 bikes behind weekly retraining over a
+  year. Weekly is better in 49 of 52 weeks, but the gap barely grows: +0.0012 bikes per 4
+  weeks. Over this year the drift is small.
+- A 12-week window is worse than using all history (+0.025) and its interval is too narrow
+  (coverage 0.768).
+- Seasonality moves the error more than model age does: weekly MAE by quarter runs from 1.352
+  (2026Q1) to 1.531 (2025Q2).
+
+## Site performance
+
+`reports/lighthouse.md`: accessibility 100 on every page, mobile and desktop. Performance is
+at least 90 on 6 of 10 page and form pairs. Map mobile is 92 (33 before M18). The misses are
+map desktop (88) and, on mobile, Accuracy (84), Station (83) and About (89). On those mobile
+pages, the time to run the app's JavaScript on a throttled phone sets the score.
+
 ## Limitations
 
 - **No weather in the served model.** Weather is collected but is not a model feature. E7 found
@@ -76,7 +108,8 @@ Same folds and test weeks as E1. Full tables are in `reports/experiments.md` and
 - **Weekend +30:** LightGBM MAE 0.750 vs persistence 0.732 — slightly worse than "no change".
 - **Rebalancing** is not observed directly; van moves show up as large errors (flagged rows).
 - **Training/live gap.** Training data ends 2026-06-30; the live collector started 2026-10-22, so
-  live forecasts run on a model that has not seen recent months.
+  live forecasts run on a model that has not seen recent months. E8 suggests this costs little
+  at +60 (0.013 bikes over a year), but it was measured on the historical feed, not the live one.
 - **New stations.** Station 118 is not in the training set and has no forecast until a retrain.
 - **No trip data.** There are no origin-destination flows; only dock counts are modelled.
 - Forecasts are estimates, not guarantees of availability.
