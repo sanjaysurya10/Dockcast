@@ -3,7 +3,7 @@
 Station-level bike availability forecasting for Dublin Bikes: bikes at +30/+60/+120 min with a
 P10-P90 range, and an honest account of where the model is wrong.
 
-Status: **v3** (PRD 17, M0-M9 and M11-M18; M10 event classifiers wait for 12 weeks of collector
+Status: **v3** (PRD 17, M0-M9 and M11-M19; M10 event classifiers wait for 12 weeks of collector
 data). Live at https://dockcast.pages.dev, with the API at https://143-47-249-111.sslip.io.
 A collector and a 15-min forecast job run in the cloud. Every number below is copied from a
 generated report and carries its MLflow run ID; nothing is hand-typed.
@@ -89,6 +89,27 @@ scored on the same 3,939,778 rows. MAE in bikes, mean over weeks.
   (coverage 0.768).
 - Seasonality moves the error more than model age does: weekly MAE by quarter runs from 1.352
   (2026Q1) to 1.531 (2025Q2).
+
+## Rebalancing simulation (E9) — simulation, not a measurement
+
+From `reports/experiments.md`, MLflow run `1716b5e76b114ef99816baaadb3a2938`, on E1's 8 test weeks at +60 using E1's
+forecasts. Demand is a replay of each station's observed net change, with the real operator's van moves
+removed. There are 2 vans of 20 bikes, each making one move per hour from 06:00 to 22:00. Riders
+are assumed not to react, and travel time is ignored. Figures are stockout-minutes per week, over
+all 115 stations.
+
+| policy | stockout min | moves |
+|---|---:|---:|
+| no action | 204581 | 0 |
+| greedy on persistence (current state) | 65711 | 211 |
+| greedy on LightGBM P50 | 54643 | 210 |
+
+- With the same vans, planning on the LightGBM forecast beat planning on the current state in
+  8 of 8 weeks: 11,068 fewer stockout-minutes per week. With 1 van the gain is 20,781 and with 4
+  vans it is 6,684.
+- The absolute values are an upper bound. In a replay a delivered bike stays until the observed
+  net change drains it, so 502 to 940 minutes are avoided per move, and λ up to 20 minutes per
+  move does not change the ranking.
 
 ## Site performance
 

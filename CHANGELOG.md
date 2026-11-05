@@ -1,5 +1,28 @@
 # Changelog
 
+## M19 — Rebalancing simulation (2026-11-05)
+
+- **E9 rebalancing simulation** (`dockcast/experiments/e9.py`, `make backtest E=E9`), run
+  `1716b5e76b114ef99816baaadb3a2938`. It is labelled as a simulation throughout.
+  - Setup: the owner's decisions in PRD 23. Demand replays each station's observed 15-min net
+    change, with rebalance-flagged changes removed. Vans carry 20 bikes and make one move per
+    hour from 06:00 to 22:00 Dublin time. Forecasts are E1 run `e4819616`'s saved +60
+    predictions, so nothing is retrained.
+  - Policies: no action, greedy on persistence, and greedy on the `lgbm_global` P50, each with
+    1, 2 and 4 vans. λ ∈ {0, 5, 10, 20}.
+  - Result with 2 vans: 204,581 → 65,711 (persistence) and 54,643 (LightGBM) stockout-minutes
+    per week. LightGBM is better in 8/8 weeks for every fleet size.
+  - The report states the replay's upper-bound caveat: 502 to 940 minutes are avoided per move,
+    and λ ≤ 20 does not change the ranking.
+- **Tests:**
+  - replay with flagged and missing changes;
+  - decision times on both DST days;
+  - the greedy move, van size, eligibility and the no-risk case;
+  - forecast lookahead and fallback;
+  - stockout and clip counting;
+  - objective and report;
+  - grid pivot.
+
 ## M18 — Drift study and polish (2026-11-05)
 
 - **E8 drift and retraining** (`dockcast/experiments/e8.py`, `make backtest E=E8`), run
